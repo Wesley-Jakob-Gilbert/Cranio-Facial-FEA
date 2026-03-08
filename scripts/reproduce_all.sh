@@ -35,7 +35,13 @@ python3 post/make_comparison_artifacts.py
 echo "[7/10] Adaptation proxy"
 python3 post/simulate_adaptation.py
 
-echo "[8/10] Results manifest"
+echo "[8/10] Remodeling loop (mewing + mouth_breathing)"
+./scripts/remodeling_loop.sh
+
+echo "[9/10] Remodeling animations"
+python3 post/make_animation.py
+
+echo "[10/10] Results manifest"
 python3 scripts/write_results_manifest.py
 
 echo "Done. Key outputs in results/"
