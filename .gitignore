@@ -19,8 +19,9 @@ NEXT_BLOCKERS.md
 # Runtime artifacts (transient, not source of truth)
 solver/elem_density.json
 
-# Agent coordination files — DO NOT ignore these
-# AGENT_COMMS.md   → tracked
-# TASK_BOARD.md    → tracked
-# PLAN.md          → tracked
-# CLAUDE.md        → tracked
+# Agent coordination files — local only, not for public repo
+AGENT_COMMS.md
+TASK_BOARD.md
+PLAN.md
+CLAUDE.md
+.claude/
