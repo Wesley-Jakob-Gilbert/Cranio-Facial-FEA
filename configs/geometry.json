@@ -10,5 +10,8 @@
     "ny": 10,
     "nz": 5
   },
-  "curvature_amplitude_m": 0.004
+  "curvature_amplitude_m": 0.004,
+  "suture_mid_thickness_elems": 1,
+  "suture_lat_width_elems": 2,
+  "suture_lat_min_i_frac": 0.5
 }

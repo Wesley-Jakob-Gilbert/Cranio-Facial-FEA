@@ -1,4 +1,15 @@
+# Legacy single-material key (read by extract_metrics.py and other non-remodeling scripts)
 material:
   name: bone_isotropic
   youngs_modulus_pa: 1.0e9
   poisson_ratio: 0.3
+
+# Multi-material zones — used by solver/make_inp.py for remodeling pipeline
+# Adolescent suture modulus is ~20-50x softer than bone (open, fibrous suture)
+materials:
+  bone:
+    youngs_modulus_pa: 1.0e9
+    poisson_ratio: 0.3
+  suture:
+    youngs_modulus_pa: 5.0e7
+    poisson_ratio: 0.40

@@ -100,6 +100,47 @@ for k in range(nz):
             ]
             eid += 1
 
+# ---------------------------------------------------------------------------
+# Element sets for multi-material remodeling
+# ---------------------------------------------------------------------------
+suture_mid_thick = int(cfg.get("suture_mid_thickness_elems", 1))
+suture_lat_width = int(cfg.get("suture_lat_width_elems", 2))
+suture_lat_min_i = int(cfg.get("suture_lat_min_i_frac", 0.5) * nx)
+
+
+def eid(i: int, j: int, k: int) -> int:
+    """Element ID for 0-based grid position (i, j, k)."""
+    return k * (ny * nx) + j * nx + i + 1
+
+
+# Midpalatal suture: 1-element-thick sagittal band at j = ny//2 (full i, full k)
+mid_center = ny // 2
+mid_lo = max(0, mid_center - suture_mid_thick // 2)
+mid_hi = min(ny - 1, mid_lo + suture_mid_thick - 1)
+suture_mid_set = {
+    eid(i, j, k)
+    for k in range(nz)
+    for j in range(mid_lo, mid_hi + 1)
+    for i in range(nx)
+}
+
+# Lateral sutures: anterior-lateral bilateral bands (high i, low/high j, all k)
+suture_lat_set = {
+    eid(i, j, k)
+    for k in range(nz)
+    for j in range(ny)
+    for i in range(suture_lat_min_i, nx)
+    if (j < suture_lat_width or j >= ny - suture_lat_width)
+} - suture_mid_set  # exclude any overlap with midpalatal band
+
+suture_all_set = suture_mid_set | suture_lat_set
+bone_elems = sorted(e for e in elements if e not in suture_all_set)
+suture_mid_elems = sorted(suture_mid_set)
+suture_lat_elems = sorted(suture_lat_set)
+
+# ---------------------------------------------------------------------------
+# Node sets
+# ---------------------------------------------------------------------------
 fixed_nodes = [nid(0, j, k) for k in range(nz + 1) for j in range(ny + 1)]
 palate_nodes = [nid(i, j, nz) for j in range(ny + 1) for i in range(nx + 1)]
 
@@ -133,6 +174,9 @@ mesh = {
         "NSET_MUSCLE_LEFT": muscle_left_nodes,
         "NSET_MUSCLE_RIGHT": muscle_right_nodes,
         "NSET_MUSCLE_ALL": muscle_all_nodes,
+        "ESET_BONE": bone_elems,
+        "ESET_SUTURE_MID": suture_mid_elems,
+        "ESET_SUTURE_LAT": suture_lat_elems,
     },
 }
 
@@ -140,3 +184,4 @@ OUT.write_text(json.dumps(mesh))
 print(f"Wrote {OUT}")
 print(f"Profile: {profile}")
 print(f"Nodes: {len(nodes)}, Elements: {len(elements)}")
+print(f"ESET_BONE: {len(bone_elems)}, ESET_SUTURE_MID: {len(suture_mid_elems)}, ESET_SUTURE_LAT: {len(suture_lat_elems)}")

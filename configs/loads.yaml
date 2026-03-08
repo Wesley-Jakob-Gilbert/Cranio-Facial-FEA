@@ -28,3 +28,16 @@ load_cases:
   medium_kpa_plus_muscle_8n:
     tongue_kpa: 2.0
     muscle_force_n: 8.0
+
+# Remodeling study cases — used by scripts/remodeling_loop.sh
+# mewing:       sustained tongue-on-palate posture (2 kPa, adolescent range)
+# mouth_breathing: no palate contact; zero tongue load produces zero nodal forces,
+#                  which is the correct mechanical analog for absent tongue pressure
+  mewing:
+    tongue_kpa: 2.0
+    muscle_force_n: 0.0
+    scenario: mewing
+  mouth_breathing:
+    tongue_kpa: 0.0
+    muscle_force_n: 0.0
+    scenario: mouth_breathing
