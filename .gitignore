@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual envs
+.venv/
+venv/
+
+# System
+.DS_Store
+
+# Generated solver/runtime artifacts
+results/**
+!results/.gitkeep
+
+# Optional local notes
+NEXT_BLOCKERS.md

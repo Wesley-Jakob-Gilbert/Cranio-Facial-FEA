@@ -1,0 +1,9 @@
+{
+  "model": "toy_maxilla_v0",
+  "status": "stub",
+  "notes": [
+    "Use simplified block/curved palate approximation",
+    "Tag palate ROI for pressure loads",
+    "Keep geometry coarse for MVP"
+  ]
+}

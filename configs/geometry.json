@@ -1,0 +1,14 @@
+{
+  "profile": "template_maxilla_v1",
+  "dimensions_m": {
+    "Lx": 0.08,
+    "Ly": 0.05,
+    "Lz": 0.03
+  },
+  "divisions": {
+    "nx": 14,
+    "ny": 10,
+    "nz": 5
+  },
+  "curvature_amplitude_m": 0.004
+}

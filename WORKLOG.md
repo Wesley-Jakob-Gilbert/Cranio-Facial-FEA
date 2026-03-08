@@ -1,0 +1,73 @@
+# WORKLOG
+
+## 2026-03-07
+- Added cross-case 3D comparison visualization script: `post/make_case_grid_visuals.py`.
+- Added richer quantitative comparison artifact script: `post/make_comparison_artifacts.py`.
+- Generated new artifacts:
+  - `results/u_mag_case_grid.png`
+  - `results/vm_case_grid.png`
+  - `results/case_comparison_table.csv`
+  - `results/case_pairwise_deltas.csv`
+  - `results/linearity_check.csv`
+  - `results/normalized_response.png`
+  - `results/linearity_check.png`
+- Added full reproducibility runner: `scripts/reproduce_all.sh`.
+- Added integrity/reproducibility manifest writer: `scripts/write_results_manifest.py`.
+- Generated `results/RESULTS_MANIFEST.md` with SHA256 hashes for 42 result files.
+- Expanded README runbook with full command chain + one-command reproduction.
+
+## 2026-03-04
+- Initialized project scaffold.
+- Added execution PLAN.md with 2-week phased milestones.
+- Added implementation stubs for geometry/mesh/solver/post.
+- Added initial implementation stubs:
+  - geometry/build_geometry.py
+  - mesh/build_mesh.py
+  - solver/make_inp.py
+  - solver/run_case.sh
+  - post/extract_metrics.py
+  - post/make_plots.py
+- Ran pipeline smoke test successfully (stub mode).
+- Generated placeholder outputs and load-case .inp placeholders.
+- Installed and used CalculiX for first real solves.
+- Replaced stub workflow with real structured C3D8 mesh + solver input generation.
+- Completed low/medium/high cases in CalculiX.
+- Extracted quantitative metrics from .dat outputs:
+  - low_kpa: max_u=1.253176e-06 m, peak_vm=6.945047e+03 Pa
+  - medium_kpa: max_u=5.012703e-06 m, peak_vm=2.778018e+04 Pa
+  - high_kpa: max_u=1.253176e-05 m, peak_vm=6.945047e+04 Pa
+- Trend check: monotonic increase confirmed.
+- Plot generation script implemented; runtime blocker: matplotlib not installed.
+- matplotlib became available; generated first comparison figure:
+  - results/mvp_load_response.png
+- Updated README with exact runnable command sequence and output locations.
+- Marked planning checklist item for documented pipeline command as complete.
+- Realism-lite upgrade: introduced mild palate curvature in mesh generator.
+- Added full-field extraction script: post/extract_fields.py
+- Added 3D visual pipeline: post/make_3d_visuals.py
+- Generated 3D outputs for each load case (u_mag + von Mises scatter views).
+- Added toy long-term adaptation proxy module: post/simulate_adaptation.py
+- Generated adaptation trend outputs for repeated medium-load stimulus.
+- Upgraded geometry from curved toy block to `template_maxilla_v1` profile.
+- Added geometry config file: `configs/geometry.json`.
+- Increased mesh resolution for smoother 3D fields (990 nodes / 700 elements).
+- Re-ran full reproducible pipeline via `scripts/reproduce_all.sh`.
+- New response metrics (template geometry):
+  - low_kpa: 1.334275e-06 m, 9.459757e+03 Pa
+  - medium_kpa: 5.337100e-06 m, 3.783902e+04 Pa
+  - high_kpa: 1.334275e-05 m, 9.459757e+04 Pa
+- Verified linearity-check values remain ~1.0 for tongue-only subset; no -2 value in current generated CSV.
+- Added simplified jaw-muscle load scenarios in configs/loads.yaml.
+- Added bilateral muscle attachment proxy sets in mesh build.
+- Updated solver input generation to apply optional muscle resultant components.
+- Generalized pipeline/scripts to all configured load cases.
+- Added muscle-effect comparison artifacts: results/muscle_effect_summary.csv and results/muscle_effect.png.
+- Added medium-pressure muscle-force sensitivity sweep cases (2N/4N/6N/8N).
+- Fixed generalized post-processing for dynamic case lists and mixed load families.
+- Regenerated all outputs for 9 total cases.
+- Added sensitivity artifacts:
+  - results/muscle_sensitivity_medium_kpa.csv
+  - results/muscle_sensitivity_medium_kpa.png
+- Added first north-star prototype animation:
+  - results/toy_morphology_evolution.gif
+  (displacement-direction pseudo-time morph; heuristic visual prototype)

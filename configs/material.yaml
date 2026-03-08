@@ -1,0 +1,4 @@
+material:
+  name: bone_isotropic
+  youngs_modulus_pa: 1.0e9
+  poisson_ratio: 0.3

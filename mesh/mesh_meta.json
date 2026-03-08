@@ -1,0 +1,9 @@
+{
+  "mesh": "toy_maxilla_mesh_v0",
+  "status": "stub",
+  "target_element_size": "coarse",
+  "quality_checks": [
+    "positive volume",
+    "no inverted elements"
+  ]
+}

@@ -1,0 +1,30 @@
+load_cases:
+  low_kpa:
+    tongue_kpa: 0.5
+    muscle_force_n: 0.0
+  medium_kpa:
+    tongue_kpa: 2.0
+    muscle_force_n: 0.0
+  high_kpa:
+    tongue_kpa: 5.0
+    muscle_force_n: 0.0
+
+  low_kpa_plus_muscle:
+    tongue_kpa: 0.5
+    muscle_force_n: 6.0
+  medium_kpa_plus_muscle:
+    tongue_kpa: 2.0
+    muscle_force_n: 6.0
+  high_kpa_plus_muscle:
+    tongue_kpa: 5.0
+    muscle_force_n: 6.0
+
+  medium_kpa_plus_muscle_2n:
+    tongue_kpa: 2.0
+    muscle_force_n: 2.0
+  medium_kpa_plus_muscle_4n:
+    tongue_kpa: 2.0
+    muscle_force_n: 4.0
+  medium_kpa_plus_muscle_8n:
+    tongue_kpa: 2.0
+    muscle_force_n: 8.0
