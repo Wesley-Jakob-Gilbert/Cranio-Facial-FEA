@@ -1,5 +1,6 @@
 {
-  "profile": "template_maxilla_v1",
+  "profile": "template_maxilla_v2",
+
   "dimensions_m": {
     "Lx": 0.08,
     "Ly": 0.05,
@@ -13,5 +14,22 @@
   "curvature_amplitude_m": 0.004,
   "suture_mid_thickness_elems": 1,
   "suture_lat_width_elems": 2,
-  "suture_lat_min_i_frac": 0.5
+  "suture_lat_min_i_frac": 0.5,
+
+  "arch_width_m": 0.038,
+  "arch_depth_m": 0.048,
+  "vault_depth_m": 0.013,
+  "ridge_height_m": 0.017,
+  "bone_thickness_m": 0.003,
+
+  "arch_flatness": 0.25,
+  "post_flare_deg": 4.0,
+  "vault_ant_scale": 1.35,
+  "thick_lat_scale": 1.4,
+
+  "divisions_v2": {
+    "nx": 44,
+    "ny": 12,
+    "nz": 4
+  }
 }

@@ -20,8 +20,13 @@ NEXT_BLOCKERS.md
 solver/elem_density.json
 
 # Agent coordination files — local only, not for public repo
-AGENT_COMMS.md
+AGENT_COMMS*.md
 TASK_BOARD.md
 PLAN.md
 CLAUDE.md
 .claude/
+
+# Miscellaneous Agent Artifacts
+PUBLISH_CHECKLIST.md
+WORKLOG.md
+MORNING_UPDATE.md

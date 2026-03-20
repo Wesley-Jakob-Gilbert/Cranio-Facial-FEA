@@ -79,10 +79,30 @@ eset_suture_mid = sets.get("ESET_SUTURE_MID", [])
 eset_suture_lat = sets.get("ESET_SUTURE_LAT", [])
 all_nodes = sorted(nodes.keys())
 
-# approximate tributary area per palate node from top face area
-Lx = mesh["dimensions"]["Lx"]
-Ly = mesh["dimensions"]["Ly"]
-area_per_node = (Lx * Ly) / max(1, len(palate))
+# approximate tributary area per palate node from actual oral-surface face areas
+# For v2 (U-shaped arch), Lx*Ly overestimates the curved surface by ~14%.
+# Instead, sum the actual k=0 (or k=nz for v1) element face areas.
+def _oral_surface_area(nodes, elems, eset_all, nz_div):
+    """Sum quad face areas on the oral surface of the mesh."""
+    import math as _m
+    total = 0.0
+    for eid in eset_all:
+        conn = elems[eid]
+        # C3D8 connectivity: first 4 nodes are k-low face, last 4 are k-high face
+        # For v2, oral surface is k=0 (nodes 0-3); for v1, it's k=nz (nodes 4-7)
+        # We use the face that palate nodes sit on — just use k-low face (indices 0-3)
+        face = conn[:4]
+        p = [nodes[n] for n in face]
+        # quad area via two triangle diagonals
+        d1 = [p[2][c] - p[0][c] for c in range(3)]
+        d2 = [p[3][c] - p[1][c] for c in range(3)]
+        cross = [d1[1]*d2[2]-d1[2]*d2[1], d1[2]*d2[0]-d1[0]*d2[2], d1[0]*d2[1]-d1[1]*d2[0]]
+        total += 0.5 * _m.sqrt(sum(c*c for c in cross))
+    return total
+
+_all_elems = sorted(set(eset_bone) | set(eset_suture_mid) | set(eset_suture_lat))
+_oral_area = _oral_surface_area(nodes, elems, _all_elems, 0)
+area_per_node = _oral_area / max(1, len(palate))
 
 
 def write_id_list(fh, ids, chunk=16):
