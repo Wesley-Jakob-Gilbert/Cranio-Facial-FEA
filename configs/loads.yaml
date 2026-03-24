@@ -1,3 +1,11 @@
+# Pressure distribution along the arch (anterior-to-posterior gradient).
+# ant_post_ratio > 1 means higher pressure anteriorly (where tongue tip presses).
+# The weight at each palate node is linearly interpolated from posterior_weight
+# to anterior_weight, then rescaled so total force is preserved.
+# Set to 1.0 for uniform pressure (legacy behavior).
+pressure_distribution:
+  ant_post_ratio: 2.5    # anterior pressure / posterior pressure
+
 load_cases:
   low_kpa:
     tongue_kpa: 0.5

@@ -102,17 +102,34 @@ def _quad_cross(p):
     ]
 
 
-def _oral_surface_area(nodes, elems, eset_all, palate_set):
-    """Sum quad face areas on the oral surface (k=0 layer only).
+def _oral_face(conn, palate_set):
+    """Return the oral-surface face of a C3D8 element, or None.
 
-    Only faces whose four nodes are all in *palate_set* are counted, which
-    restricts the sum to the actual oral surface rather than k-low faces of
-    every element layer.
+    For v2 (palate at k=0), the oral face is conn[:4] (k-low).
+    For v1 (palate at k=nz), the oral face is conn[4:8] (k-high).
+    Returns the face whose 4 nodes are all in palate_set, or None if
+    neither face qualifies (element is not on the oral surface).
+    """
+    lo = conn[:4]
+    if all(n in palate_set for n in lo):
+        return lo
+    hi = conn[4:8]
+    if all(n in palate_set for n in hi):
+        return hi
+    return None
+
+
+def _oral_surface_area(nodes, elems, eset_all, palate_set):
+    """Sum quad face areas on the oral surface only.
+
+    Only element faces whose four nodes are all in *palate_set* are
+    counted. This works for both v1 (palate at k=nz, face is conn[4:8])
+    and v2 (palate at k=0, face is conn[:4]).
     """
     total = 0.0
     for eid in eset_all:
-        face = elems[eid][:4]
-        if not all(n in palate_set for n in face):
+        face = _oral_face(elems[eid], palate_set)
+        if face is None:
             continue
         p = [nodes[n] for n in face]
         cx = _quad_cross(p)
@@ -146,8 +163,8 @@ def _palate_node_normals(nodes, elems, eset_all, palate_set):
     # Accumulate raw (area-weighted) normals per node
     accum: dict[int, list[float]] = {}
     for eid in eset_all:
-        face = elems[eid][:4]
-        if not all(n in palate_set for n in face):
+        face = _oral_face(elems[eid], palate_set)
+        if face is None:
             continue
         p = [nodes[n] for n in face]
         cx = _quad_cross(p)
@@ -182,6 +199,43 @@ _all_elems = sorted(set(eset_bone) | set(eset_suture_mid) | set(eset_suture_lat)
 _oral_area = _oral_surface_area(nodes, elems, _all_elems, _palate_set)
 area_per_node = _oral_area / max(1, len(palate))
 _node_normals = _palate_node_normals(nodes, elems, _all_elems, _palate_set)
+
+# ---------------------------------------------------------------------------
+# Nonuniform pressure distribution (anterior-posterior gradient)
+# ---------------------------------------------------------------------------
+_loads_cfg = yaml.safe_load(LOADS_PATH.read_text())
+_pdist = _loads_cfg.get("pressure_distribution", {})
+_ant_post_ratio = float(_pdist.get("ant_post_ratio", 1.0))
+
+
+def _pressure_weights(palate_nids, nds, ant_post_ratio):
+    """Per-node pressure weight based on x-position along the arch.
+
+    Returns dict nid -> weight. Mean weight = 1.0 (total force preserved).
+    With ant_post_ratio = 1.0, all weights = 1.0.
+    """
+    if ant_post_ratio == 1.0 or len(palate_nids) == 0:
+        return {nid: 1.0 for nid in palate_nids}
+
+    xs = {nid: nds[nid][0] for nid in palate_nids}
+    x_min, x_max = min(xs.values()), max(xs.values())
+    x_range = x_max - x_min
+    if x_range < 1e-12:
+        return {nid: 1.0 for nid in palate_nids}
+
+    # Linear: w_post at x_min, w_ant at x_max, w_ant/w_post = R, mean = 1.0
+    R = ant_post_ratio
+    w_post = 2.0 / (1.0 + R)
+    w_ant = 2.0 * R / (1.0 + R)
+
+    weights = {}
+    for nid in palate_nids:
+        t = (xs[nid] - x_min) / x_range
+        weights[nid] = w_post + (w_ant - w_post) * t
+    return weights
+
+
+_pressure_wt = _pressure_weights(palate, nodes, _ant_post_ratio)
 
 
 def write_id_list(fh, ids, chunk=16):
@@ -347,17 +401,16 @@ for case, spec in loads.items():
         f.write("NSET_FIXED, 1, 3, 0.0\n")
 
         # Tongue pressure as surface-normal loads on palate nodes.
-        # Each node's force = -magnitude * normal, where the normal points
-        # into the bone and the tongue pushes against the surface (negative
-        # of the outward-from-bone direction). Omit for mouth-breathing.
+        # Force per node = weight * magnitude * (-normal), where the normal
+        # points into bone and weight encodes anterior-posterior gradient.
         if f_tongue_mag != 0.0:
             f.write("*CLOAD\n")
             for nid in palate:
                 nn = _node_normals.get(nid, [0.0, 0.0, 1.0])
-                # Force opposes the into-bone normal (tongue pushes inward)
-                fx = -f_tongue_mag * nn[0]
-                fy = -f_tongue_mag * nn[1]
-                fz = -f_tongue_mag * nn[2]
+                w = _pressure_wt.get(nid, 1.0)
+                fx = -f_tongue_mag * w * nn[0]
+                fy = -f_tongue_mag * w * nn[1]
+                fz = -f_tongue_mag * w * nn[2]
                 f.write(f"{nid}, 1, {fx:.6e}\n")
                 f.write(f"{nid}, 2, {fy:.6e}\n")
                 f.write(f"{nid}, 3, {fz:.6e}\n")
