@@ -79,30 +79,109 @@ eset_suture_mid = sets.get("ESET_SUTURE_MID", [])
 eset_suture_lat = sets.get("ESET_SUTURE_LAT", [])
 all_nodes = sorted(nodes.keys())
 
-# approximate tributary area per palate node from actual oral-surface face areas
-# For v2 (U-shaped arch), Lx*Ly overestimates the curved surface by ~14%.
-# Instead, sum the actual k=0 (or k=nz for v1) element face areas.
-def _oral_surface_area(nodes, elems, eset_all, nz_div):
-    """Sum quad face areas on the oral surface of the mesh."""
-    import math as _m
+# ---------------------------------------------------------------------------
+# Oral-surface geometry: face areas and per-node surface normals
+# ---------------------------------------------------------------------------
+# For the v2 U-shaped arch, the palatal surface is curved, so tongue pressure
+# should act normal to the surface at each node rather than uniformly in -Z.
+# We find k=0 face quads (oral surface) by checking which element faces have
+# all four nodes in NSET_PALATE, then compute area-weighted normals per node.
+
+def _quad_cross(p):
+    """Return cross product of quad diagonals (p[0]->p[2] x p[1]->p[3]).
+
+    The magnitude of the result equals twice the quad area. The direction
+    is the face outward normal (sign depends on winding).
+    """
+    d1 = [p[2][c] - p[0][c] for c in range(3)]
+    d2 = [p[3][c] - p[1][c] for c in range(3)]
+    return [
+        d1[1] * d2[2] - d1[2] * d2[1],
+        d1[2] * d2[0] - d1[0] * d2[2],
+        d1[0] * d2[1] - d1[1] * d2[0],
+    ]
+
+
+def _oral_surface_area(nodes, elems, eset_all, palate_set):
+    """Sum quad face areas on the oral surface (k=0 layer only).
+
+    Only faces whose four nodes are all in *palate_set* are counted, which
+    restricts the sum to the actual oral surface rather than k-low faces of
+    every element layer.
+    """
     total = 0.0
     for eid in eset_all:
-        conn = elems[eid]
-        # C3D8 connectivity: first 4 nodes are k-low face, last 4 are k-high face
-        # For v2, oral surface is k=0 (nodes 0-3); for v1, it's k=nz (nodes 4-7)
-        # We use the face that palate nodes sit on — just use k-low face (indices 0-3)
-        face = conn[:4]
+        face = elems[eid][:4]
+        if not all(n in palate_set for n in face):
+            continue
         p = [nodes[n] for n in face]
-        # quad area via two triangle diagonals
-        d1 = [p[2][c] - p[0][c] for c in range(3)]
-        d2 = [p[3][c] - p[1][c] for c in range(3)]
-        cross = [d1[1]*d2[2]-d1[2]*d2[1], d1[2]*d2[0]-d1[0]*d2[2], d1[0]*d2[1]-d1[1]*d2[0]]
-        total += 0.5 * _m.sqrt(sum(c*c for c in cross))
+        cx = _quad_cross(p)
+        total += 0.5 * math.sqrt(sum(c * c for c in cx))
     return total
 
+
+def _palate_node_normals(nodes, elems, eset_all, palate_set):
+    """Compute area-weighted unit surface normals for each palate node.
+
+    For every k=0 face quad (element face whose 4 nodes all lie in
+    palate_set), the face normal is obtained via cross product of the
+    quad diagonals. The raw cross product is proportional to face area,
+    so accumulating it at each node gives an area-weighted average.
+
+    After accumulation each node's normal is normalised to unit length.
+
+    Convention: the raw cross product from _quad_cross points in the
+    direction determined by the element winding. For v2, the reversed-j
+    winding makes the k-low face normal point downward (toward -z /
+    toward the tongue, i.e. outward from the bone). For v1, the standard
+    winding gives a normal pointing inward (+z into the bone on the k=nz
+    face). We enforce a consistent convention: the returned normal points
+    INTO the bone (away from the oral cavity). If the raw cross product's
+    z-component is positive (pointing up / into bone), we keep it;
+    otherwise we flip it. This works for both v1 and v2 because the
+    nasal surface is always above (higher z) the oral surface.
+
+    Returns dict mapping node_id -> [nx, ny, nz] unit normal (into bone).
+    """
+    # Accumulate raw (area-weighted) normals per node
+    accum: dict[int, list[float]] = {}
+    for eid in eset_all:
+        face = elems[eid][:4]
+        if not all(n in palate_set for n in face):
+            continue
+        p = [nodes[n] for n in face]
+        cx = _quad_cross(p)
+
+        # Ensure normal points into bone (positive z direction on average).
+        # The palatal vault means z isn't purely vertical, but across the
+        # whole surface the "into bone" direction has a positive z component.
+        if cx[2] < 0:
+            cx = [-cx[0], -cx[1], -cx[2]]
+
+        for nid in face:
+            if nid not in accum:
+                accum[nid] = [0.0, 0.0, 0.0]
+            accum[nid][0] += cx[0]
+            accum[nid][1] += cx[1]
+            accum[nid][2] += cx[2]
+
+    # Normalise to unit vectors
+    normals: dict[int, list[float]] = {}
+    for nid, raw in accum.items():
+        mag = math.sqrt(raw[0] ** 2 + raw[1] ** 2 + raw[2] ** 2)
+        if mag < 1e-30:
+            # Degenerate — fall back to pure +z (into bone)
+            normals[nid] = [0.0, 0.0, 1.0]
+        else:
+            normals[nid] = [raw[0] / mag, raw[1] / mag, raw[2] / mag]
+    return normals
+
+
+_palate_set = set(palate)
 _all_elems = sorted(set(eset_bone) | set(eset_suture_mid) | set(eset_suture_lat))
-_oral_area = _oral_surface_area(nodes, elems, _all_elems, 0)
+_oral_area = _oral_surface_area(nodes, elems, _all_elems, _palate_set)
 area_per_node = _oral_area / max(1, len(palate))
+_node_normals = _palate_node_normals(nodes, elems, _all_elems, _palate_set)
 
 
 def write_id_list(fh, ids, chunk=16):
@@ -218,7 +297,8 @@ for case, spec in loads.items():
     tongue_kpa, muscle_force_n = parse_case(spec)
 
     p_pa = tongue_kpa * 1000.0
-    f_tongue_node = -p_pa * area_per_node
+    # Force magnitude per palate node (positive value; direction comes from normals)
+    f_tongue_mag = p_pa * area_per_node
 
     f_muscle_each_side = muscle_force_n / 2.0 if muscle_force_n > 0 else 0.0
     nL = max(1, len(muscle_left))
@@ -266,11 +346,21 @@ for case, spec in loads.items():
         f.write("*BOUNDARY\n")
         f.write("NSET_FIXED, 1, 3, 0.0\n")
 
-        # Tongue pressure — omit entirely for mouth-breathing (tongue_kpa=0.0)
-        if f_tongue_node != 0.0:
+        # Tongue pressure as surface-normal loads on palate nodes.
+        # Each node's force = -magnitude * normal, where the normal points
+        # into the bone and the tongue pushes against the surface (negative
+        # of the outward-from-bone direction). Omit for mouth-breathing.
+        if f_tongue_mag != 0.0:
             f.write("*CLOAD\n")
             for nid in palate:
-                f.write(f"{nid}, 3, {f_tongue_node:.6e}\n")
+                nn = _node_normals.get(nid, [0.0, 0.0, 1.0])
+                # Force opposes the into-bone normal (tongue pushes inward)
+                fx = -f_tongue_mag * nn[0]
+                fy = -f_tongue_mag * nn[1]
+                fz = -f_tongue_mag * nn[2]
+                f.write(f"{nid}, 1, {fx:.6e}\n")
+                f.write(f"{nid}, 2, {fy:.6e}\n")
+                f.write(f"{nid}, 3, {fz:.6e}\n")
 
         # Jaw-muscle resultant proxy
         if muscle_force_n > 0:
@@ -297,6 +387,6 @@ for case, spec in loads.items():
 
     print(
         f"Wrote {out} [{mode_label}] "
-        f"(tongue_kPa={tongue_kpa}, Ftongue_node={f_tongue_node:.3e} N, "
+        f"(tongue_kPa={tongue_kpa}, Ftongue_node_mag={f_tongue_mag:.3e} N, "
         f"Fmuscle_total={muscle_force_n:.3e} N)"
     )
