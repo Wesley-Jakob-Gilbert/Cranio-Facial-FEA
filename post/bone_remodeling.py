@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Huiskes-style density remodeling update per scenario/cycle.
 
+Implements the Huiskes lazy-zone (dead-band) remodeling law:
+  stimulus = (psi / psi_ref) - 1.0
+  if stimulus > +s:   apposition  drho = alpha_app * (stimulus - s)
+  if stimulus < -s:   resorption  drho = alpha_res * (stimulus + s)
+  else:               lazy zone   drho = 0.0
+
+Separate apposition/resorption rates reflect the biological reality
+that bone forms slower than it resorbs.
+
 Inputs:
 - mesh/mesh_data.json (expects ESET_BONE / ESET_SUTURE_* when available)
 - configs/remodeling.yaml
@@ -87,7 +96,8 @@ def update_summary(summary_path: Path, row: dict):
 
     fields = [
         "scenario", "cycle", "mean_rho", "min_rho", "max_rho",
-        "apposition_fraction", "resorption_fraction"
+        "apposition_fraction", "resorption_fraction",
+        "lazy_fraction", "mean_abs_drho",
     ]
     with summary_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
@@ -104,12 +114,20 @@ def main():
 
     cfg = load_cfg()
     psi_ref = float(cfg["psi_ref_pa"])
-    alpha = float(cfg["alpha"])
     rho_min = float(cfg["rho_min"])
     rho_max = float(cfg["rho_max"])
     n_power = float(cfg["n_power"])
     E_bone = float(cfg["E_bone_pa"])
     E_suture = float(cfg["E_suture_pa"])
+
+    # Lazy-zone remodeling parameters (backward compat with old 'alpha' key)
+    if "alpha_apposition" in cfg:
+        alpha_app = float(cfg["alpha_apposition"])
+        alpha_res = float(cfg["alpha_resorption"])
+    else:
+        alpha_app = float(cfg["alpha"])
+        alpha_res = float(cfg["alpha"])
+    lazy_s = float(cfg.get("lazy_zone_s", 0.0))
 
     mesh = json.loads((ROOT / "mesh" / "mesh_data.json").read_text())
     all_eids, bone, suture = load_sets(mesh)
@@ -139,7 +157,15 @@ def main():
         E_prev = max(1e3, E_bone * (r0 ** n_power))
         psi = (vm_e * vm_e) / (2.0 * E_prev)
         stimulus = (psi / psi_ref) - 1.0
-        drho = alpha * stimulus
+
+        # Lazy-zone (dead-band) remodeling law
+        if stimulus > lazy_s:
+            drho = alpha_app * (stimulus - lazy_s)
+        elif stimulus < -lazy_s:
+            drho = alpha_res * (stimulus + lazy_s)
+        else:
+            drho = 0.0
+
         r1 = min(rho_max, max(rho_min, r0 + drho))
         rho_new[eid] = r1
         delta[eid] = r1 - r0
@@ -161,23 +187,34 @@ def main():
 
     vals = list(rho_new.values())
     bone_ids = list(bone)
-    app = sum(1 for eid in bone_ids if delta[eid] > 0) / max(1, len(bone_ids))
-    res = sum(1 for eid in bone_ids if delta[eid] < 0) / max(1, len(bone_ids))
+    n_bone = max(1, len(bone_ids))
+    app = sum(1 for eid in bone_ids if delta[eid] > 1e-12) / n_bone
+    res = sum(1 for eid in bone_ids if delta[eid] < -1e-12) / n_bone
+    lazy = sum(1 for eid in bone_ids if abs(delta[eid]) <= 1e-12) / n_bone
+
+    bone_rhos = [rho_new[eid] for eid in bone_ids]
+    bone_deltas = [abs(delta[eid]) for eid in bone_ids if abs(delta[eid]) > 1e-12]
+    mean_abs_drho = sum(bone_deltas) / max(1, len(bone_deltas)) if bone_deltas else 0.0
 
     update_summary(
         ROOT / "results" / "remodeling_summary.csv",
         {
             "scenario": scenario,
             "cycle": cycle,
-            "mean_rho": f"{sum(vals)/len(vals):.6f}",
-            "min_rho": f"{min(vals):.6f}",
-            "max_rho": f"{max(vals):.6f}",
+            "mean_rho": f"{sum(bone_rhos)/len(bone_rhos):.6f}",
+            "min_rho": f"{min(bone_rhos):.6f}",
+            "max_rho": f"{max(bone_rhos):.6f}",
             "apposition_fraction": f"{app:.6f}",
             "resorption_fraction": f"{res:.6f}",
+            "lazy_fraction": f"{lazy:.6f}",
+            "mean_abs_drho": f"{mean_abs_drho:.6f}",
         },
     )
 
-    print(f"Updated density for {scenario} cycle {cycle}")
+    print(f"[remodel] {scenario} cycle {cycle}: "
+          f"mean_rho={sum(bone_rhos)/len(bone_rhos):.4f}  "
+          f"app={app:.1%}  res={res:.1%}  lazy={lazy:.1%}  "
+          f"mean|drho|={mean_abs_drho:.6f}")
 
 
 if __name__ == "__main__":

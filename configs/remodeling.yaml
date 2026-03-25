@@ -1,6 +1,8 @@
 remodeling:
-  psi_ref_pa: 0.005
-  alpha: 0.02
+  psi_ref_pa: 5.0
+  alpha_apposition: 0.001
+  alpha_resorption: 0.002
+  lazy_zone_s: 0.15
   rho_min: 0.4
   rho_max: 1.5
   n_power: 2.0
