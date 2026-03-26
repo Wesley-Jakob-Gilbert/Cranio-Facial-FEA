@@ -10,6 +10,15 @@ Implements the Huiskes lazy-zone (dead-band) remodeling law:
 Separate apposition/resorption rates reflect the biological reality
 that bone forms slower than it resorbs.
 
+Per-layer psi_ref: cortical and cancellous bone have different homeostatic
+SED setpoints, reflecting the different mechanical environments of compact
+vs trabecular bone. Fallback to global psi_ref for legacy (single-material)
+meshes.
+
+Supports layered bone (cortical/cancellous) with different base moduli,
+tooth root inclusions (held at rho=1.0), and suture strain-dependent
+modulus softening.
+
 Inputs:
 - mesh/mesh_data.json (expects ESET_BONE / ESET_SUTURE_* when available)
 - configs/remodeling.yaml
@@ -19,6 +28,7 @@ Inputs:
 Outputs:
 - results/<scenario>/elem_density.json
 - results/<scenario>/snapshots/cycle_<N>_density.json
+- results/<scenario>/suture_modulus.json (if suture remodeling enabled)
 - results/remodeling_summary.csv (append/update per cycle)
 """
 from __future__ import annotations
@@ -47,6 +57,11 @@ def load_sets(mesh: dict):
     s_lat = set(sets.get("ESET_SUTURE_LAT", []))
     suture = s_mid | s_lat
 
+    # Fine-grained layer sets (may be empty for legacy meshes)
+    cortical = set(sets.get("ESET_CORTICAL", []))
+    cancellous = set(sets.get("ESET_CANCELLOUS", []))
+    tooth_root = set(sets.get("ESET_TOOTH_ROOT", []))
+
     if not bone:
         bone = all_eids - suture
     if not suture:
@@ -56,10 +71,10 @@ def load_sets(mesh: dict):
     overlap = bone & suture
     if overlap:
         bone -= overlap
-    missing = all_eids - bone - suture
+    missing = all_eids - bone - suture - tooth_root
     bone |= missing
 
-    return all_eids, bone, suture
+    return all_eids, bone, suture, cortical, cancellous, tooth_root
 
 
 def read_vm(path: Path):
@@ -98,6 +113,7 @@ def update_summary(summary_path: Path, row: dict):
         "scenario", "cycle", "mean_rho", "min_rho", "max_rho",
         "apposition_fraction", "resorption_fraction",
         "lazy_fraction", "mean_abs_drho",
+        "mean_suture_E", "min_suture_E",
     ]
     with summary_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
@@ -113,12 +129,20 @@ def main():
     cycle = int(sys.argv[2])
 
     cfg = load_cfg()
-    psi_ref = float(cfg["psi_ref_pa"])
+    psi_ref_global = float(cfg["psi_ref_pa"])
     rho_min = float(cfg["rho_min"])
     rho_max = float(cfg["rho_max"])
     n_power = float(cfg["n_power"])
     E_bone = float(cfg["E_bone_pa"])
     E_suture = float(cfg["E_suture_pa"])
+
+    # Layered material moduli (fallback to E_bone for backward compat)
+    E_cortical = float(cfg.get("E_cortical_pa", E_bone))
+    E_cancellous = float(cfg.get("E_cancellous_pa", E_bone))
+
+    # Per-layer homeostatic SED setpoints (fallback to global psi_ref)
+    psi_ref_cortical = float(cfg.get("psi_ref_cortical_pa", psi_ref_global))
+    psi_ref_cancellous = float(cfg.get("psi_ref_cancellous_pa", psi_ref_global))
 
     # Lazy-zone remodeling parameters (backward compat with old 'alpha' key)
     if "alpha_apposition" in cfg:
@@ -130,7 +154,8 @@ def main():
     lazy_s = float(cfg.get("lazy_zone_s", 0.0))
 
     mesh = json.loads((ROOT / "mesh" / "mesh_data.json").read_text())
-    all_eids, bone, suture = load_sets(mesh)
+    all_eids, bone, suture, cortical, cancellous, tooth_root = load_sets(mesh)
+    _has_layers = bool(cortical) or bool(cancellous) or bool(tooth_root)
 
     case_dir = ROOT / "results" / scenario
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -153,8 +178,24 @@ def main():
             delta[eid] = rho_new[eid] - r0
             continue
 
+        # Tooth root elements: held at rho=1.0 (like suture, no remodeling)
+        if eid in tooth_root:
+            rho_new[eid] = 1.0
+            delta[eid] = rho_new[eid] - r0
+            continue
+
         vm_e = float(vm.get(eid, 0.0))
-        E_prev = max(1e3, E_bone * (r0 ** n_power))
+        # Use layer-specific base modulus and psi_ref if available
+        if _has_layers and eid in cortical:
+            E_base = E_cortical
+            psi_ref = psi_ref_cortical
+        elif _has_layers and eid in cancellous:
+            E_base = E_cancellous
+            psi_ref = psi_ref_cancellous
+        else:
+            E_base = E_bone
+            psi_ref = psi_ref_global
+        E_prev = max(1e3, E_base * (r0 ** n_power))
         psi = (vm_e * vm_e) / (2.0 * E_prev)
         stimulus = (psi / psi_ref) - 1.0
 
@@ -176,11 +217,60 @@ def main():
     snap_dir.mkdir(parents=True, exist_ok=True)
     write_density(snap_dir / f"cycle_{cycle}_density.json", rho_new)
 
+    # --- Suture strain-dependent modulus update ---
+    suture_cfg = cfg.get("suture_remodeling", {})
+    suture_remod_enabled = suture_cfg.get("enabled", False)
+    suture_modulus = {}
+
+    if suture_remod_enabled:
+        beta = float(suture_cfg.get("beta", 0.5))
+        E_suture_baseline = float(cfg.get("E_suture_pa", 5.0e7))
+        E_min = float(suture_cfg.get("E_min_pa", 1.0e7))
+        strain_thresh = float(suture_cfg.get("strain_threshold", 0.001))
+
+        # Load prior suture modulus (for cumulative softening)
+        suture_mod_path = case_dir / "suture_modulus.json"
+        prior_suture_mod = {}
+        if suture_mod_path.exists():
+            prior_suture_mod = json.loads(suture_mod_path.read_text())
+
+        for eid in suture:
+            E_prev_suture = float(prior_suture_mod.get(str(eid), E_suture_baseline))
+            vm_e = float(vm.get(eid, 0.0))
+            strain = vm_e / E_prev_suture if E_prev_suture > 0 else 0.0
+
+            if strain > strain_thresh:
+                E_new = E_prev_suture * (1.0 - beta * (strain - strain_thresh))
+                E_new = max(E_min, min(E_suture_baseline, E_new))
+            else:
+                E_new = E_prev_suture
+
+            suture_modulus[str(eid)] = E_new
+
+        # Write suture modulus state
+        suture_mod_path.write_text(json.dumps(suture_modulus, indent=2))
+
+        # Write snapshot
+        (snap_dir / f"cycle_{cycle}_suture_modulus.json").write_text(
+            json.dumps(suture_modulus, indent=2)
+        )
+
+        # Stats for summary
+        suture_E_vals = list(suture_modulus.values())
+        mean_suture_E = sum(suture_E_vals) / max(1, len(suture_E_vals))
+        min_suture_E = min(suture_E_vals) if suture_E_vals else E_suture_baseline
+
     if bool(cfg.get("write_elem_modulus_debug", False)):
         mod = {}
         for eid, r in rho_new.items():
             if eid in suture:
                 mod[str(eid)] = E_suture
+            elif eid in tooth_root:
+                mod[str(eid)] = float(cfg.get("E_tooth_root_pa", 2.0e10))
+            elif _has_layers and eid in cortical:
+                mod[str(eid)] = E_cortical * (r ** n_power)
+            elif _has_layers and eid in cancellous:
+                mod[str(eid)] = E_cancellous * (r ** n_power)
             else:
                 mod[str(eid)] = E_bone * (r ** n_power)
         (case_dir / "elem_modulus_debug.json").write_text(json.dumps(mod, indent=2))
@@ -196,25 +286,31 @@ def main():
     bone_deltas = [abs(delta[eid]) for eid in bone_ids if abs(delta[eid]) > 1e-12]
     mean_abs_drho = sum(bone_deltas) / max(1, len(bone_deltas)) if bone_deltas else 0.0
 
-    update_summary(
-        ROOT / "results" / "remodeling_summary.csv",
-        {
-            "scenario": scenario,
-            "cycle": cycle,
-            "mean_rho": f"{sum(bone_rhos)/len(bone_rhos):.6f}",
-            "min_rho": f"{min(bone_rhos):.6f}",
-            "max_rho": f"{max(bone_rhos):.6f}",
-            "apposition_fraction": f"{app:.6f}",
-            "resorption_fraction": f"{res:.6f}",
-            "lazy_fraction": f"{lazy:.6f}",
-            "mean_abs_drho": f"{mean_abs_drho:.6f}",
-        },
-    )
+    summary_row = {
+        "scenario": scenario,
+        "cycle": cycle,
+        "mean_rho": f"{sum(bone_rhos)/len(bone_rhos):.6f}",
+        "min_rho": f"{min(bone_rhos):.6f}",
+        "max_rho": f"{max(bone_rhos):.6f}",
+        "apposition_fraction": f"{app:.6f}",
+        "resorption_fraction": f"{res:.6f}",
+        "lazy_fraction": f"{lazy:.6f}",
+        "mean_abs_drho": f"{mean_abs_drho:.6f}",
+    }
+    if suture_remod_enabled and suture_modulus:
+        summary_row["mean_suture_E"] = f"{mean_suture_E:.6e}"
+        summary_row["min_suture_E"] = f"{min_suture_E:.6e}"
+
+    update_summary(ROOT / "results" / "remodeling_summary.csv", summary_row)
+
+    suture_info = ""
+    if suture_remod_enabled and suture_modulus:
+        suture_info = f"  mean_suture_E={mean_suture_E:.4e}  min_suture_E={min_suture_E:.4e}"
 
     print(f"[remodel] {scenario} cycle {cycle}: "
           f"mean_rho={sum(bone_rhos)/len(bone_rhos):.4f}  "
           f"app={app:.1%}  res={res:.1%}  lazy={lazy:.1%}  "
-          f"mean|drho|={mean_abs_drho:.6f}")
+          f"mean|drho|={mean_abs_drho:.6f}{suture_info}")
 
 
 if __name__ == "__main__":

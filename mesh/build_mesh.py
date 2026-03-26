@@ -348,7 +348,32 @@ def generate_v2(cfg: dict):
     } - suture_mid_set
 
     suture_all = suture_mid_set | suture_lat_set
-    bone_elems = sorted(e for e in elements if e not in suture_all)
+    bone_elems_set = set(e for e in elements if e not in suture_all)
+
+    # --- Tooth root element identification ---
+    tooth_root_elems = set()
+    tr_cfg = cfg.get("tooth_roots", {})
+    if tr_cfg.get("enabled", False):
+        j_layers = tr_cfg.get("j_layers", [0, 1, 2])
+        for pos_name, pos_cfg in tr_cfg.get("positions", {}).items():
+            i_lo, i_hi = pos_cfg["i_range"]
+            for i in range(i_lo, i_hi + 1):
+                for j in j_layers:
+                    for k in range(nz):
+                        eid = k * (ny * nx) + j * nx + i + 1
+                        if eid in bone_elems_set:  # exclude suture elements
+                            tooth_root_elems.add(eid)
+
+    # --- Cortical / cancellous split of remaining bone ---
+    bone_minus_teeth = bone_elems_set - tooth_root_elems
+    cortical_elems = set()
+    cancellous_elems = set()
+    for eid in bone_minus_teeth:
+        k = (eid - 1) // (ny * nx)
+        if k == 0 or k == nz - 1:
+            cortical_elems.add(eid)
+        else:
+            cancellous_elems.add(eid)
 
     sets = {
         "NSET_FIXED": fixed_nodes,
@@ -356,10 +381,24 @@ def generate_v2(cfg: dict):
         "NSET_MUSCLE_LEFT": muscle_left,
         "NSET_MUSCLE_RIGHT": muscle_right,
         "NSET_MUSCLE_ALL": sorted(set(muscle_left + muscle_right)),
-        "ESET_BONE": bone_elems,
+        "ESET_CORTICAL": sorted(cortical_elems),
+        "ESET_CANCELLOUS": sorted(cancellous_elems),
+        "ESET_TOOTH_ROOT": sorted(tooth_root_elems),
+        # Keep ESET_BONE as union of cortical + cancellous for backward compat
+        "ESET_BONE": sorted(cortical_elems | cancellous_elems),
         "ESET_SUTURE_MID": sorted(suture_mid_set),
         "ESET_SUTURE_LAT": sorted(suture_lat_set),
     }
+
+    # Partition assertion: every element must be assigned exactly once
+    all_assigned = (set(sets["ESET_CORTICAL"])
+                    | set(sets["ESET_CANCELLOUS"])
+                    | set(sets["ESET_TOOTH_ROOT"])
+                    | set(sets["ESET_SUTURE_MID"])
+                    | set(sets["ESET_SUTURE_LAT"]))
+    assert all_assigned == set(range(1, nx * ny * nz + 1)), \
+        f"Partition mismatch: {len(all_assigned)} != {nx * ny * nz}"
+
     dims = {"Lx": arch_depth, "Ly": arch_width, "Lz": bone_thick,
             "arch_flatness": arch_flatness, "post_flare_deg": post_flare_deg}
     return nodes, elements, sets, nx, ny, nz, dims
@@ -391,6 +430,17 @@ print(f"Nodes: {len(nodes)}, Elements: {len(elements)}")
 bone = sets["ESET_BONE"]
 smid = sets["ESET_SUTURE_MID"]
 slat = sets["ESET_SUTURE_LAT"]
+cort = sets.get("ESET_CORTICAL", [])
+canc = sets.get("ESET_CANCELLOUS", [])
+troot = sets.get("ESET_TOOTH_ROOT", [])
 print(f"ESET_BONE: {len(bone)}, ESET_SUTURE_MID: {len(smid)}, ESET_SUTURE_LAT: {len(slat)}")
-assert len(bone) + len(smid) + len(slat) == len(elements), "Element sets not exhaustive!"
-print("Element set partition: OK")
+if cort or canc or troot:
+    print(f"ESET_CORTICAL: {len(cort)}, ESET_CANCELLOUS: {len(canc)}, ESET_TOOTH_ROOT: {len(troot)}")
+    # Fine-grained partition check: cortical + cancellous + tooth_root + sutures = total
+    fine_total = len(cort) + len(canc) + len(troot) + len(smid) + len(slat)
+    assert fine_total == len(elements), \
+        f"Fine-grained partition mismatch: {fine_total} != {len(elements)}"
+    print("Fine-grained element set partition: OK")
+else:
+    assert len(bone) + len(smid) + len(slat) == len(elements), "Element sets not exhaustive!"
+    print("Element set partition: OK")

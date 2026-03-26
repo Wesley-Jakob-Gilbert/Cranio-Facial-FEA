@@ -13,3 +13,12 @@ materials:
   suture:
     youngs_modulus_pa: 5.0e7
     poisson_ratio: 0.40
+  cortical:
+    youngs_modulus_pa: 1.5e10
+    poisson_ratio: 0.3
+  cancellous:
+    youngs_modulus_pa: 5.0e8
+    poisson_ratio: 0.3
+  tooth_root:
+    youngs_modulus_pa: 2.0e10
+    poisson_ratio: 0.31

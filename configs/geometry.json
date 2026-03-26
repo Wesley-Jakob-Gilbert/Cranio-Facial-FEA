@@ -31,5 +31,19 @@
     "nx": 44,
     "ny": 12,
     "nz": 4
+  },
+
+  "tooth_roots": {
+    "enabled": true,
+    "j_layers": [0, 1, 2],
+    "positions": {
+      "incisors":    {"i_range": [20, 24]},
+      "canines":     {"i_range": [17, 19]},
+      "canines_r":   {"i_range": [25, 27]},
+      "premolars":   {"i_range": [12, 16]},
+      "premolars_r": {"i_range": [28, 32]},
+      "molars":      {"i_range": [4, 11]},
+      "molars_r":    {"i_range": [33, 40]}
+    }
   }
 }

@@ -26,12 +26,14 @@ for scenario in "${SCENARIOS[@]}"; do
 
   # reset per-scenario evolving state
   rm -f "results/$scenario/elem_density.json"
+  rm -f "results/$scenario/suture_modulus.json"
 
   for cycle in $(seq 1 "$CYCLES"); do
     echo "  cycle $cycle/$CYCLES"
 
     # feedback hook: scenario density -> solver input sidecar expected by make_inp.py
     cp "results/$scenario/elem_density.json" solver/elem_density.json 2>/dev/null || true
+    cp "results/$scenario/suture_modulus.json" solver/suture_modulus.json 2>/dev/null || true
 
     python3 solver/make_inp.py
     ./solver/run_case.sh "$scenario"
