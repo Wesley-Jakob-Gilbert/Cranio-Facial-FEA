@@ -64,14 +64,25 @@ else:
     E_tooth_root = 2.0e10
     nu_tooth_root = 0.31
 
+# Physical mass densities for gravity loading (kg/m³)
+RHO_CORTICAL = 1900.0
+RHO_CANCELLOUS = 800.0
+RHO_BONE = 1800.0       # legacy single-material
+RHO_SUTURE = 1200.0
+RHO_TOOTH = 2100.0       # dentin
+
 # Remodeling parameters (defaults; overridden by remodeling.yaml when present)
 n_power = 2      # power-law exponent E(rho) = E_bone * rho^n
+n_power_cortical = 3.0   # cortical bone: Carter-Hayes n~3
+n_power_cancellous = 2.0 # cancellous bone: n~2
 n_bins = 10      # number of density bins for per-element material grouping
 E_cortical_remodel = E_cortical    # base modulus for density-binned cortical
 E_cancellous_remodel = E_cancellous  # base modulus for density-binned cancellous
 if REMODEL_PATH.exists():
     rm = yaml.safe_load(REMODEL_PATH.read_text()).get("remodeling", {})
     n_power = float(rm.get("n_power", n_power))
+    n_power_cortical = float(rm.get("n_power_cortical", n_power))
+    n_power_cancellous = float(rm.get("n_power_cancellous", n_power))
     n_bins = int(rm.get("n_bins", n_bins))
     E_cortical_remodel = float(rm.get("E_cortical_pa", E_cortical))
     E_cancellous_remodel = float(rm.get("E_cancellous_pa", E_cancellous))
@@ -292,6 +303,14 @@ def _bin_elements(elem_list, density_map, rho_lo, rho_hi, bin_width, prefix):
     return {i: v for i, v in bins.items() if v}
 
 
+def _write_elastic_density(fh, E, nu, rho_mass):
+    """Write *ELASTIC and *DENSITY cards for a material."""
+    fh.write("*ELASTIC\n")
+    fh.write(f"{E:.6e}, {nu:.6f}\n")
+    fh.write("*DENSITY\n")
+    fh.write(f"{rho_mass:.1f}\n")
+
+
 def _write_suture_blocks(fh):
     """Write suture ELSET, MATERIAL, SOLID SECTION blocks.
 
@@ -323,8 +342,7 @@ def _write_suture_blocks(fh):
         for bidx in sorted(active):
             E_center = s_E_lo + (bidx + 0.5) * s_bin_width
             fh.write(f"*MATERIAL, NAME=SUTURE_BIN_{bidx:02d}\n")
-            fh.write("*ELASTIC\n")
-            fh.write(f"{E_center:.6e}, {nu_suture:.6f}\n")
+            _write_elastic_density(fh, E_center, nu_suture, RHO_SUTURE)
         for bidx in sorted(active):
             fh.write(f"*SOLID SECTION, ELSET=ESUTURE_BIN_{bidx:02d}, MATERIAL=SUTURE_BIN_{bidx:02d}\n")
             fh.write(",\n")
@@ -337,8 +355,7 @@ def _write_suture_blocks(fh):
             fh.write("*ELSET, ELSET=ESUTURE_LAT\n")
             write_id_list(fh, eset_suture_lat)
         fh.write("*MATERIAL, NAME=SUTURE\n")
-        fh.write("*ELASTIC\n")
-        fh.write(f"{E_suture:.6e}, {nu_suture:.6f}\n")
+        _write_elastic_density(fh, E_suture, nu_suture, RHO_SUTURE)
         if eset_suture_mid:
             fh.write("*SOLID SECTION, ELSET=ESUTURE_MID, MATERIAL=SUTURE\n")
             fh.write(",\n")
@@ -384,26 +401,23 @@ def write_material_blocks(fh):
         if eset_tooth_root:
             fh.write("*ELSET, ELSET=ETOOTHROOT\n")
             write_id_list(fh, eset_tooth_root)
-        # Write materials: cortical bins
+        # Write materials: cortical bins (n=3 per Carter-Hayes)
         for idx in sorted(cort_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
-            E_bin = E_cortical_remodel * (rho_center ** n_power)
+            E_bin = E_cortical_remodel * (rho_center ** n_power_cortical)
             fh.write(f"*MATERIAL, NAME=CORT_BIN_{idx:02d}\n")
-            fh.write("*ELASTIC\n")
-            fh.write(f"{E_bin:.6e}, {nu_cortical:.6f}\n")
+            _write_elastic_density(fh, E_bin, nu_cortical, RHO_CORTICAL)
 
-        # Write materials: cancellous bins
+        # Write materials: cancellous bins (n=2)
         for idx in sorted(canc_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
-            E_bin = E_cancellous_remodel * (rho_center ** n_power)
+            E_bin = E_cancellous_remodel * (rho_center ** n_power_cancellous)
             fh.write(f"*MATERIAL, NAME=CANC_BIN_{idx:02d}\n")
-            fh.write("*ELASTIC\n")
-            fh.write(f"{E_bin:.6e}, {nu_cancellous:.6f}\n")
+            _write_elastic_density(fh, E_bin, nu_cancellous, RHO_CANCELLOUS)
 
         # Tooth root: fixed material (no density update)
         fh.write("*MATERIAL, NAME=TOOTH_ROOT\n")
-        fh.write("*ELASTIC\n")
-        fh.write(f"{E_tooth_root:.6e}, {nu_tooth_root:.6f}\n")
+        _write_elastic_density(fh, E_tooth_root, nu_tooth_root, RHO_TOOTH)
 
         # Solid sections: cortical + cancellous bins
         for idx in sorted(cort_bins):
@@ -443,8 +457,7 @@ def write_material_blocks(fh):
             rho_center = rho_lo + (idx + 0.5) * bin_width
             E_bin = E_bone * (rho_center ** n_power)
             fh.write(f"*MATERIAL, NAME=BONE_BIN_{idx:02d}\n")
-            fh.write("*ELASTIC\n")
-            fh.write(f"{E_bin:.6e}, {nu_bone:.6f}\n")
+            _write_elastic_density(fh, E_bin, nu_bone, RHO_BONE)
 
         for idx in sorted(active):
             fh.write(f"*SOLID SECTION, ELSET=EBONE_BIN_{idx:02d}, MATERIAL=BONE_BIN_{idx:02d}\n")
@@ -465,16 +478,13 @@ def write_material_blocks(fh):
             write_id_list(fh, eset_tooth_root)
 
         fh.write("*MATERIAL, NAME=CORTICAL\n")
-        fh.write("*ELASTIC\n")
-        fh.write(f"{E_cortical:.6e}, {nu_cortical:.6f}\n")
+        _write_elastic_density(fh, E_cortical, nu_cortical, RHO_CORTICAL)
 
         fh.write("*MATERIAL, NAME=CANCELLOUS\n")
-        fh.write("*ELASTIC\n")
-        fh.write(f"{E_cancellous:.6e}, {nu_cancellous:.6f}\n")
+        _write_elastic_density(fh, E_cancellous, nu_cancellous, RHO_CANCELLOUS)
 
         fh.write("*MATERIAL, NAME=TOOTH_ROOT\n")
-        fh.write("*ELASTIC\n")
-        fh.write(f"{E_tooth_root:.6e}, {nu_tooth_root:.6f}\n")
+        _write_elastic_density(fh, E_tooth_root, nu_tooth_root, RHO_TOOTH)
 
         if eset_cortical:
             fh.write("*SOLID SECTION, ELSET=ECORTICAL, MATERIAL=CORTICAL\n")
@@ -494,8 +504,7 @@ def write_material_blocks(fh):
             fh.write("*ELSET, ELSET=ESET_BONE\n")
             write_id_list(fh, eset_bone)
         fh.write("*MATERIAL, NAME=BONE\n")
-        fh.write("*ELASTIC\n")
-        fh.write(f"{E_bone:.6e}, {nu_bone:.6f}\n")
+        _write_elastic_density(fh, E_bone, nu_bone, RHO_BONE)
 
         if eset_bone:
             fh.write("*SOLID SECTION, ELSET=ESET_BONE, MATERIAL=BONE\n")
@@ -520,6 +529,7 @@ else:
 
 for case, spec in loads.items():
     tongue_kpa, muscle_force_n = parse_case(spec)
+    gravity_enabled = spec.get("gravity", False) if isinstance(spec, dict) else False
 
     p_pa = tongue_kpa * 1000.0
     # Force magnitude per palate node (positive value; direction comes from normals)
@@ -586,6 +596,13 @@ for case, spec in loads.items():
                 f.write(f"{nid}, 2, {fy:.6e}\n")
                 f.write(f"{nid}, 3, {fz:.6e}\n")
 
+        # Gravity body force (rho_bone ~ 1800 kg/m³, g = -9.81 m/s² in Z)
+        if gravity_enabled:
+            f.write("*DLOAD\n")
+            f.write("EALL, GRAV, 9.81, 0.0, 0.0, -1.0\n")
+            # Density card for gravity: CalculiX uses *DENSITY on material
+            # We add *DENSITY to each material block separately — see below
+
         # Jaw-muscle resultant proxy
         if muscle_force_n > 0:
             f.write("*CLOAD\n")
@@ -601,12 +618,14 @@ for case, spec in loads.items():
         f.write("*NODE FILE\n")
         f.write("U\n")
         f.write("*EL FILE\n")
-        f.write("S\n")
+        f.write("S, ENER\n")
 
         f.write("*NODE PRINT, NSET=NALL\n")
         f.write("U\n")
         f.write("*EL PRINT, ELSET=EALL\n")
         f.write("S\n")
+        f.write("*EL PRINT, ELSET=EALL\n")
+        f.write("ENER\n")
         f.write("*END STEP\n")
 
     print(

@@ -12,7 +12,7 @@ materials:
     poisson_ratio: 0.3
   suture:
     youngs_modulus_pa: 5.0e7
-    poisson_ratio: 0.40
+    poisson_ratio: 0.30
   cortical:
     youngs_modulus_pa: 1.5e10
     poisson_ratio: 0.3

@@ -1,15 +1,17 @@
 remodeling:
   # Global fallback (used when per-layer refs absent or legacy mesh)
-  psi_ref_pa: 0.5
-  # Per-layer homeostatic SED setpoints (median SED from mewing baseline)
-  psi_ref_cortical_pa: 0.55
-  psi_ref_cancellous_pa: 0.045
+  psi_ref_pa: 0.25
+  # Per-layer homeostatic SED setpoints (median true SED from mewing ENER output)
+  psi_ref_cortical_pa: 0.24
+  psi_ref_cancellous_pa: 0.02
   alpha_apposition: 0.001
   alpha_resorption: 0.002
   lazy_zone_s: 0.50
   rho_min: 0.4
   rho_max: 1.5
   n_power: 2.0
+  n_power_cortical: 3.0
+  n_power_cancellous: 2.0
   E_bone_pa: 1.0e9
   E_suture_pa: 5.0e7
   E_cortical_pa: 1.5e10
@@ -20,6 +22,6 @@ remodeling:
   write_elem_modulus_debug: false
   suture_remodeling:
     enabled: true
-    beta: 0.5
+    beta: 5.0
     E_min_pa: 1.0e7
-    strain_threshold: 0.001
+    strain_threshold: 0.00015

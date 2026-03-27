@@ -86,6 +86,16 @@ def read_vm(path: Path):
     return vm
 
 
+def read_sed(path: Path):
+    """Read true strain energy density from elem_sed.csv (CalculiX ENER output)."""
+    sed = {}
+    with path.open("r", encoding="utf-8") as f:
+        r = csv.DictReader(f)
+        for row in r:
+            sed[int(row["elem_id"])] = float(row["sed_avg_pa"])
+    return sed
+
+
 def read_density(path: Path, all_eids: set[int]):
     if not path.exists():
         return {eid: 1.0 for eid in all_eids}
@@ -133,6 +143,8 @@ def main():
     rho_min = float(cfg["rho_min"])
     rho_max = float(cfg["rho_max"])
     n_power = float(cfg["n_power"])
+    n_power_cortical = float(cfg.get("n_power_cortical", n_power))
+    n_power_cancellous = float(cfg.get("n_power_cancellous", n_power))
     E_bone = float(cfg["E_bone_pa"])
     E_suture = float(cfg["E_suture_pa"])
 
@@ -165,6 +177,15 @@ def main():
         raise SystemExit(f"Missing {vm_path}; run solve + extract_fields first")
 
     vm = read_vm(vm_path)
+
+    # Use true SED from CalculiX ENER output if available; fall back to vm²/2E
+    sed_path = case_dir / "elem_sed.csv"
+    sed_direct = read_sed(sed_path) if sed_path.exists() else None
+    if sed_direct:
+        print(f"  Using true SED from {sed_path.name} ({len(sed_direct)} elements)")
+    else:
+        print(f"  Warning: {sed_path.name} not found, falling back to vm²/2E approximation")
+
     rho_path = case_dir / "elem_density.json"
     rho_prev = read_density(rho_path, all_eids)
 
@@ -184,19 +205,31 @@ def main():
             delta[eid] = rho_new[eid] - r0
             continue
 
-        vm_e = float(vm.get(eid, 0.0))
-        # Use layer-specific base modulus and psi_ref if available
+        # Select layer-specific psi_ref and n_power
         if _has_layers and eid in cortical:
-            E_base = E_cortical
             psi_ref = psi_ref_cortical
+            n_pow = n_power_cortical
         elif _has_layers and eid in cancellous:
-            E_base = E_cancellous
             psi_ref = psi_ref_cancellous
+            n_pow = n_power_cancellous
         else:
-            E_base = E_bone
             psi_ref = psi_ref_global
-        E_prev = max(1e3, E_base * (r0 ** n_power))
-        psi = (vm_e * vm_e) / (2.0 * E_prev)
+            n_pow = n_power
+
+        # Use true SED from CalculiX if available; otherwise approximate
+        if sed_direct and eid in sed_direct:
+            psi = sed_direct[eid]
+        else:
+            vm_e = float(vm.get(eid, 0.0))
+            if _has_layers and eid in cortical:
+                E_base = E_cortical
+            elif _has_layers and eid in cancellous:
+                E_base = E_cancellous
+            else:
+                E_base = E_bone
+            E_prev = max(1e3, E_base * (r0 ** n_pow))
+            psi = (vm_e * vm_e) / (2.0 * E_prev)
+
         stimulus = (psi / psi_ref) - 1.0
 
         # Lazy-zone (dead-band) remodeling law
@@ -268,9 +301,9 @@ def main():
             elif eid in tooth_root:
                 mod[str(eid)] = float(cfg.get("E_tooth_root_pa", 2.0e10))
             elif _has_layers and eid in cortical:
-                mod[str(eid)] = E_cortical * (r ** n_power)
+                mod[str(eid)] = E_cortical * (r ** n_power_cortical)
             elif _has_layers and eid in cancellous:
-                mod[str(eid)] = E_cancellous * (r ** n_power)
+                mod[str(eid)] = E_cancellous * (r ** n_power_cancellous)
             else:
                 mod[str(eid)] = E_bone * (r ** n_power)
         (case_dir / "elem_modulus_debug.json").write_text(json.dumps(mod, indent=2))

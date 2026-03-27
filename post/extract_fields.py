@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Extract nodal displacement and element von Mises fields from CalculiX .dat.
+"""Extract nodal displacement, element von Mises, and element SED from CalculiX .dat.
 
 Outputs per case:
 - results/<case>/node_u.csv
 - results/<case>/elem_vm.csv
+- results/<case>/elem_sed.csv  (strain energy density from ENER output)
 """
 from __future__ import annotations
 from pathlib import Path
@@ -19,6 +20,10 @@ CASES = list(LOADS.keys())
 node_re = re.compile(r"^\s*(\d+)\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)")
 stress_re = re.compile(
     r"^\s*(\d+)\s+\d+\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)\s+([+-]?\d\.\d+E[+-]\d+)"
+)
+# ENER line: elem_id  integ_point  energy_density_value
+ener_re = re.compile(
+    r"^\s*(\d+)\s+\d+\s+([+-]?\d\.\d+E[+-]\d+)"
 )
 
 
@@ -37,19 +42,28 @@ for case in CASES:
 
     nodes = {}
     elem_vm_acc = {}
+    elem_sed_acc = {}
 
     in_disp = False
     in_stress = False
+    in_ener = False
 
     for line in dat.read_text(encoding="utf-8", errors="ignore").splitlines():
         ls = line.strip().lower()
         if ls.startswith("displacements"):
             in_disp = True
             in_stress = False
+            in_ener = False
             continue
         if ls.startswith("stresses"):
             in_stress = True
             in_disp = False
+            in_ener = False
+            continue
+        if ls.startswith("internal energy density"):
+            in_ener = True
+            in_disp = False
+            in_stress = False
             continue
         if not ls:
             continue
@@ -72,6 +86,15 @@ for case in CASES:
                 acc[0] += vm
                 acc[1] += 1
 
+        elif in_ener:
+            e = ener_re.match(line)
+            if e:
+                eid = int(e.group(1))
+                sed_val = float(e.group(2))
+                acc = elem_sed_acc.setdefault(eid, [0.0, 0])
+                acc[0] += sed_val
+                acc[1] += 1
+
     out_nodes = ROOT / "results" / case / "node_u.csv"
     with out_nodes.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -88,4 +111,13 @@ for case in CASES:
             ssum, cnt = elem_vm_acc[eid]
             w.writerow([eid, ssum / cnt if cnt else 0.0])
 
-    print(f"Wrote {out_nodes} and {out_elem}")
+    out_sed = ROOT / "results" / case / "elem_sed.csv"
+    with out_sed.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["elem_id", "sed_avg_pa"])
+        for eid in sorted(elem_sed_acc):
+            ssum, cnt = elem_sed_acc[eid]
+            w.writerow([eid, ssum / cnt if cnt else 0.0])
+
+    sed_info = f" + {out_sed}" if elem_sed_acc else ""
+    print(f"Wrote {out_nodes} and {out_elem}{sed_info}")

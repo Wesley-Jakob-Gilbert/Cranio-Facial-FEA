@@ -48,4 +48,5 @@ load_cases:
   mouth_breathing:
     tongue_kpa: 0.0
     muscle_force_n: 0.0
+    gravity: true
     scenario: mouth_breathing
