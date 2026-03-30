@@ -105,6 +105,28 @@ def _scale_ortho(ortho_cfg: dict, rho: float, n: float) -> dict:
 
 
 
+
+
+def _continuous_E_from_rho(rho: float, E_cortical: float, n_cortical: float,
+                             n_cancellous: float, rho_t: float,
+                             enforce_c0: bool = True,
+                             E_cancellous_explicit: float = 5.0e8) -> tuple[float, float]:
+    """Compute continuous density-driven E(rho) for the solver bins.
+
+    Audit_4 Fix 1: replaces discontinuous set-based assignment in make_inp.py.
+    Uses C0-continuous piecewise power law matching bone_remodeling.py logic.
+
+    Returns (E_Pa, n_eff).
+    """
+    if enforce_c0:
+        E_cancellous = E_cortical * (rho_t ** (n_cortical - n_cancellous))
+    else:
+        E_cancellous = E_cancellous_explicit
+    if rho >= rho_t:
+        return max(1.0e3, E_cortical * (rho ** n_cortical)), n_cortical
+    else:
+        return max(1.0e3, E_cancellous * (rho ** n_cancellous)), n_cancellous
+
 # Physical mass densities for gravity loading (kg/m³)
 RHO_CORTICAL = 1900.0
 RHO_CANCELLOUS = 800.0
@@ -117,6 +139,8 @@ n_power = 2      # power-law exponent E(rho) = E_bone * rho^n
 n_power_cortical = 3.0   # cortical bone: Carter-Hayes n~3
 n_power_cancellous = 2.0 # cancellous bone: n~2
 n_bins = 10      # number of density bins for per-element material grouping
+rho_transition = 1.2      # density threshold for trabecular→cortical transition (Audit_4 Fix 1)
+enforce_c0_modulus = True  # enforce C0 continuity at rho_transition (Audit_4 Fix 1)
 E_cortical_remodel = E_cortical    # base modulus for density-binned cortical
 E_cancellous_remodel = E_cancellous  # base modulus for density-binned cancellous
 if REMODEL_PATH.exists():
@@ -127,6 +151,9 @@ if REMODEL_PATH.exists():
     n_bins = int(rm.get("n_bins", n_bins))
     E_cortical_remodel = float(rm.get("E_cortical_pa", E_cortical))
     E_cancellous_remodel = float(rm.get("E_cancellous_pa", E_cancellous))
+    # Audit_4 Fix 1: continuous modulus law config
+    rho_transition = float(rm.get("rho_transition", 1.2))
+    enforce_c0_modulus = bool(rm.get("continuous_modulus_enforce_c0", True))
 
 # Per-element density override written by bone_remodeling.py each remodeling cycle.
 # Keys are string element IDs; values are relative density (rho, dimensionless).
@@ -486,7 +513,10 @@ def write_material_blocks(fh, case_name: str = "", case_spec=None):
         # When orthotropic mode is active, scale all moduli by rho^n (density-invariant Poisson).
         for idx in sorted(cort_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
-            E_bin = E_cortical_remodel * (rho_center ** n_power_cortical)
+            # Audit_4 Fix 1: continuous E(rho) — no set-based discontinuity
+            E_bin, _ = _continuous_E_from_rho(
+                rho_center, E_cortical_remodel, n_power_cortical, n_power_cancellous,
+                rho_transition, enforce_c0_modulus, E_cancellous_remodel)
             fh.write(f"*MATERIAL, NAME=CORT_BIN_{idx:02d}\n")
             if USE_ORTHO_CORTICAL and _ortho_cfg:
                 _ortho_scaled = _scale_ortho(_ortho_cfg, rho_center, n_power_cortical)
@@ -498,7 +528,10 @@ def write_material_blocks(fh, case_name: str = "", case_spec=None):
         # Write materials: cancellous bins (n=2)
         for idx in sorted(canc_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
-            E_bin = E_cancellous_remodel * (rho_center ** n_power_cancellous)
+            # Audit_4 Fix 1: continuous E(rho)
+            E_bin, _ = _continuous_E_from_rho(
+                rho_center, E_cortical_remodel, n_power_cortical, n_power_cancellous,
+                rho_transition, enforce_c0_modulus, E_cancellous_remodel)
             fh.write(f"*MATERIAL, NAME=CANC_BIN_{idx:02d}\n")
             _write_elastic_density(fh, E_bin, nu_cancellous, RHO_CANCELLOUS)
 

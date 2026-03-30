@@ -1,18 +1,10 @@
 remodeling:
-  # Global fallback (used when per-layer refs absent or legacy mesh)
   psi_ref_pa: 0.25
-  # Per-layer homeostatic SED setpoints (median true SED from mewing ENER output)
   psi_ref_cortical_pa: 0.24
   psi_ref_cancellous_pa: 0.02
   alpha_apposition: 0.001
-  alpha_resorption: 0.002
-
-  # --- LAZY ZONE (dead-band) ---
-  # Physiological lazy zones are ~±10-20% for trabecular bone.
-  # Previous value of 0.50 was too broad (50% dead-band suppressed most remodeling).
-  # Narrowed to 0.15 per Frost's Mechanostat literature.
+  alpha_resorption: 0.005
   lazy_zone_s: 0.15
-
   rho_min: 0.4
   rho_max: 1.5
   n_power: 2.0
@@ -26,84 +18,29 @@ remodeling:
   cycles: 12
   cycle_label: months
   write_elem_modulus_debug: false
-
-  # --- FIX 1 + Audit_3 Fix 2: Density-normalized STRAIN-EQUIVALENT stimulus ---
-  # When true: stimulus = sqrt(psi / (psi_ref * rho^n)) - 1
-  # The sqrt converts the SED ratio into the dimensionless strain ratio (eps_eff/eps_ref).
-  # This matches the analytical osteocyte Mechanostat: the cell detects strain, not energy.
-  # Without sqrt: linear ratio overestimates sensitivity 3-5× at physiological density range.
-  # density_normalize_stimulus must also be true for sqrt to apply.
   density_normalize_stimulus: true
-  # Audit_3 item 2: use sqrt(psi/(psi_ref*rho^n))-1 for correct strain-equivalent stimulus.
-  # Set false to revert to linear ratio (audit_2 Fix 1 behavior).
   density_stimulus_sqrt: true
-
-  # --- Audit_3 Fix 3b: psi_ref auto-calibration for cyclic loading ---
-  # When true (and cyclic_loading.enabled=true): scale all psi_ref values by
-  # (swallow_peak_kpa / tongue_kpa_ref)^2 to match homeostatic peak-swallow SED.
-  # Without this: psi_ref is calibrated to static SED but psi_eff is the dynamic
-  # (peak swallow) SED — off by 306× for mewing scenario, causing every element
-  # to fire at drho_max every cycle regardless of alpha settings.
   psi_ref_auto_calibrate_cyclic: true
-
-  # --- Poisson ratios for Fix 5 isotropic SED fallback ---
-  # Used in sed_from_tensor_isotropic() when CalculiX ENER is unavailable.
   nu_bone: 0.3
   nu_cortical: 0.3
   nu_cancellous: 0.3
-
-  # --- FIX 4: Δρ rate limiter (audit_2 item 4) ---
-  # Maximum absolute density change per cycle (dimensionless relative density).
-  # Reflects biological limits of osteoblast/osteoclast recruitment.
-  # Typical literature range: 0.02-0.1 per remeshing cycle.
-  # Prevents numerical oscillations near stress concentrations (explicit Euler stability).
-  drho_max_per_cycle: 0.05
-
-  # --- CYCLIC LOAD CORRECTION: Power-Law (Fix 2, audit_2 item 2) ---
-  # Rubin & Lanyon (1984): static loads are biologically inert for bone formation.
-  # Turner (1998): osteogenic signal ∝ N^(1/m) · ε_peak, m ≈ 3-4.
-  #
-  # Power-law formulation (replaces linear time-fraction averaging):
-  #   psi_peak = psi_rest * (swallow_peak_kpa / tongue_kpa_ref)^2
-  #   psi_eff  = psi_peak * (swallow_cycles_per_day / ref_cycles)^(1/m_power)
-  #
-  # Static rest_frac is DROPPED — it does not contribute to osteogenesis.
-  # Literature: peak tongue pressures during swallowing ~ 30-50 kPa
-  # (Adams et al. 2013, Cichero et al.). Swallowing ~2000x/day × ~0.5 s each.
+  drho_max_per_cycle: 0.03
   cyclic_loading:
     enabled: true
-    swallow_cycles_per_day: 2000       # cycles/day (Adams 2013)
-    swallow_peak_kpa: 35.0             # peak tongue-palate pressure during swallow
-    tongue_kpa_ref: 2.0                # reference load case kPa (mewing baseline)
-    # Audit_3 Fix 3a: ref_cycles = habitual daily swallowing count (Turner N_0 = N_habitual).
-    # At homeostasis (N_actual = N_habit), cycle_factor = 1.0 → no up/down regulation.
-    # Old value of 1.0 caused 6.69× spurious amplification at every scenario.
-    ref_cycles_per_day: 2000           # homeostatic habitual swallowing rate (= swallow_cycles_per_day)
-    # Turner (1998) power exponent: m ≈ 4 (range 3-5 in literature)
-    # Lower m → more sensitive to cycle count; higher m → cycle count matters less
+    swallow_cycles_per_day: 2000
+    swallow_peak_kpa: 35.0
+    tongue_kpa_ref: 2.0
+    ref_cycles_per_day: 2000
     m_power: 4.0
-
-  # --- FIX 3: Tension-only suture softening (audit_2 item 3) ---
-  # Physical basis: cranial sutures widen (soften) under TENSION (membrane opening),
-  # and resist / ossify under COMPRESSION. Von Mises stress is non-negative and
-  # mixes compressive deviatoric stress, making it a non-physical trigger.
-  # Now uses max_principal_stress (s1) from elem_principal_stress.csv.
-  #
-  # Softening fires only when s1 > tension_threshold_pa (positive = tension).
-  # Under compressive dominant loading (s1 <= 0): recovery proceeds instead.
+    masticatory_amplification_factor: 2.5
   suture_remodeling:
     enabled: true
-    # Softening rate for exponential decay model.
-    # E_new = E_prev * exp(-beta * (s1 - threshold) / E_prev)
-    # beta=40 gives ~33% E drop at a Hookean excess strain of ~0.025 (physiological).
     beta: 40.0
     E_min_pa: 1.0e7
-    # Tensile stress threshold for suture softening onset (Pa).
-    # 10 kPa ≈ typical onset for cranial suture widening in literature.
-    # (replaces the old strain_threshold × E_prev proxy)
-    tension_threshold_pa: 1.0e4      # 10 kPa
-    # Sub-threshold recovery rate (fraction of E-gap recovered per cycle).
-    # Models partial secondary ossification when load is sub-threshold.
+    tension_threshold_pa: 1.0e4
     recovery_rate: 0.05
-    # Creep decay constant (cycles). Informational; drives beta if cyclic enabled.
     tau_creep: 24.0
+    E_bone_max_pa: 5000000000.0
+    ossification_rate_factor: 0.2
+  rho_transition: 1.2
+  continuous_modulus_enforce_c0: true
