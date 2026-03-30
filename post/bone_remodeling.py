@@ -266,6 +266,19 @@ def main():
     E_suture = float(cfg["E_suture_pa"])
     E_cortical = float(cfg.get("E_cortical_pa", E_bone))
     E_cancellous = float(cfg.get("E_cancellous_pa", E_bone))
+
+    # Orthotropic cortical fallback SED: use E1 (principal loading axis) if available.
+    # The vm²/2E approximation should use the stiffness axis most aligned with
+    # the primary load direction. E1 (periosteal-endosteal) is the correct choice.
+    mat_path = ROOT / "configs" / "material.yaml"
+    _ortho_cfg_rm = {}
+    if mat_path.exists():
+        import yaml as _yaml
+        _mat = _yaml.safe_load(mat_path.read_text())
+        _ortho_cfg_rm = _mat.get("materials", {}).get("cortical_ortho", {})
+    _ortho_enabled = bool(_ortho_cfg_rm.get("enabled", False))
+    # E_cortical_fallback: used for vm²/2E SED approximation when ENER not available
+    E_cortical_fallback = float(_ortho_cfg_rm.get("E1_pa", E_cortical)) if _ortho_enabled else E_cortical
     psi_ref_cortical = float(cfg.get("psi_ref_cortical_pa", psi_ref_global))
     psi_ref_cancellous = float(cfg.get("psi_ref_cancellous_pa", psi_ref_global))
 
@@ -338,7 +351,9 @@ def main():
         else:
             vm_e = float(vm.get(eid, 0.0))
             if _has_layers and eid in cortical:
-                E_base = E_cortical
+                # Use E1 (principal axis) when orthotropic is enabled;
+                # otherwise fall back to scalar E_cortical.
+                E_base = E_cortical_fallback if _ortho_enabled else E_cortical
             elif _has_layers and eid in cancellous:
                 E_base = E_cancellous
             else:

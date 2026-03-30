@@ -52,12 +52,16 @@ if "materials" in mat_cfg:
     E_tooth_root = float(mats["tooth_root"]["youngs_modulus_pa"]) if "tooth_root" in mats else 2.0e10
     nu_tooth_root = float(mats["tooth_root"]["poisson_ratio"]) if "tooth_root" in mats else 0.31
 
+    # Suture viscoelastic Prony params (for relaxed-modulus sustained load cases)
+    _suture_visco = mats.get("suture", {}).get("viscoelastic", {})
+
 else:
     leg = mat_cfg["material"]
     E_bone = float(leg["youngs_modulus_pa"])
     nu_bone = float(leg["poisson_ratio"])
     E_suture = E_bone * 0.05
     nu_suture = nu_bone
+    _suture_visco = {}  # no visco params in legacy config
     E_cortical = E_bone
     nu_cortical = nu_bone
     E_cancellous = E_bone
@@ -65,9 +69,40 @@ else:
     E_tooth_root = 2.0e10
     nu_tooth_root = 0.31
 
+# Suture relaxed modulus: E_relax = E_inst * (1 - g1)
+# Used for sustained (mewing) load cases instead of E_inst.
+# If viscoelastic not configured, E_suture_relax == E_suture (no correction).
+_g1 = float(_suture_visco.get("g1", 0.0)) if _suture_visco.get("enabled", False) else 0.0
+E_suture_relax = E_suture * (1.0 - _g1)
+
 # Orthotropic cortical bone (optional; disabled unless cortical_ortho.enabled=true)
 _ortho_cfg = mat_cfg.get("materials", {}).get("cortical_ortho", {})
 USE_ORTHO_CORTICAL = bool(_ortho_cfg.get("enabled", False))
+
+
+def _scale_ortho(ortho_cfg: dict, rho: float, n: float) -> dict:
+    """Return a density-scaled copy of an orthotropic material constants dict.
+
+    Each Young's modulus and shear modulus is scaled by rho^n (Carter-Hayes
+    power law). Poisson's ratios are density-invariant.
+
+    This allows density-binned remodeling to respect orthotropic symmetry:
+    stiffness is reduced/elevated proportionally in all principal directions
+    as bone density changes, preserving the ratio E1:E2:E3:G12:G13:G23.
+    """
+    scale = rho ** n
+    return {
+        "E1_pa":  float(ortho_cfg["E1_pa"])  * scale,
+        "E2_pa":  float(ortho_cfg["E2_pa"])  * scale,
+        "E3_pa":  float(ortho_cfg["E3_pa"])  * scale,
+        "G12_pa": float(ortho_cfg["G12_pa"]) * scale,
+        "G13_pa": float(ortho_cfg["G13_pa"]) * scale,
+        "G23_pa": float(ortho_cfg["G23_pa"]) * scale,
+        "nu12": float(ortho_cfg["nu12"]),
+        "nu13": float(ortho_cfg["nu13"]),
+        "nu23": float(ortho_cfg["nu23"]),
+    }
+
 
 
 # Physical mass densities for gravity loading (kg/m³)
@@ -335,17 +370,23 @@ def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
     fh.write(f"{rho_mass:.1f}\n")
 
 
-def _write_suture_blocks(fh):
+def _write_suture_blocks(fh, E_suture_override: float | None = None):
     """Write suture ELSET, MATERIAL, SOLID SECTION blocks.
+
+    Args:
+        E_suture_override: if provided, use this modulus as the suture baseline
+            instead of the module-level E_suture. Pass E_suture_relax for
+            sustained (mewing) load cases to capture long-term stress relaxation.
 
     If suture_mod is populated and spans a range, bins suture elements
     by modulus into up to 5 groups. Otherwise writes a single SUTURE material.
     """
+    _E_base = E_suture_override if E_suture_override is not None else E_suture
     suture_eids = list(eset_suture_mid) + list(eset_suture_lat)
     if not suture_eids:
         return
 
-    suture_E_vals = [float(suture_mod.get(eid, E_suture)) for eid in suture_eids]
+    suture_E_vals = [float(suture_mod.get(eid, _E_base)) for eid in suture_eids]
     s_E_lo = min(suture_E_vals)
     s_E_hi = max(suture_E_vals)
 
@@ -379,7 +420,7 @@ def _write_suture_blocks(fh):
             fh.write("*ELSET, ELSET=ESUTURE_LAT\n")
             write_id_list(fh, eset_suture_lat)
         fh.write("*MATERIAL, NAME=SUTURE\n")
-        _write_elastic_density(fh, E_suture, nu_suture, RHO_SUTURE)
+        _write_elastic_density(fh, _E_base, nu_suture, RHO_SUTURE)
         if eset_suture_mid:
             fh.write("*SOLID SECTION, ELSET=ESUTURE_MID, MATERIAL=SUTURE\n")
             fh.write(",\n")
@@ -388,7 +429,7 @@ def _write_suture_blocks(fh):
             fh.write(",\n")
 
 
-def write_material_blocks(fh):
+def write_material_blocks(fh, case_name: str = "", case_spec=None):
     """Write *ELSET, *MATERIAL, and *SOLID SECTION blocks.
 
     Supports two mesh configurations:
@@ -399,7 +440,23 @@ def write_material_blocks(fh):
     - Baseline (no elem_density.json): fixed material properties
     - Density-binned (elem_density.json present): cortical and cancellous elements
       binned by density; tooth root held fixed; suture held fixed
+
+    Args:
+        case_name: load-case key (e.g. "mewing"). Used to select suture modulus:
+            sustained posture cases use E_suture_relax (long-term relaxed modulus);
+            transient/peak cases use E_suture (instantaneous modulus).
+        case_spec: the load-case spec dict (may contain "scenario" key).
     """
+    # Determine effective suture modulus for this load case.
+    # Mewing (sustained tongue-on-palate posture) → use relaxed modulus (Prony).
+    # All other cases → use instantaneous modulus.
+    _is_sustained = False
+    if isinstance(case_spec, dict):
+        _is_sustained = case_spec.get("scenario", "") == "mewing"
+    elif case_name == "mewing":
+        _is_sustained = True
+    _E_suture_case = E_suture_relax if _is_sustained else E_suture
+
     if density_override and _has_layers:
         # --- Density-binned mode with layered materials ---
         # Compute global rho range across all remodeling-eligible elements
@@ -426,11 +483,17 @@ def write_material_blocks(fh):
             fh.write("*ELSET, ELSET=ETOOTHROOT\n")
             write_id_list(fh, eset_tooth_root)
         # Write materials: cortical bins (n=3 per Carter-Hayes)
+        # When orthotropic mode is active, scale all moduli by rho^n (density-invariant Poisson).
         for idx in sorted(cort_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
             E_bin = E_cortical_remodel * (rho_center ** n_power_cortical)
             fh.write(f"*MATERIAL, NAME=CORT_BIN_{idx:02d}\n")
-            _write_elastic_density(fh, E_bin, nu_cortical, RHO_CORTICAL)
+            if USE_ORTHO_CORTICAL and _ortho_cfg:
+                _ortho_scaled = _scale_ortho(_ortho_cfg, rho_center, n_power_cortical)
+                _write_elastic_density(fh, E_bin, nu_cortical, RHO_CORTICAL,
+                                       ortho=_ortho_scaled)
+            else:
+                _write_elastic_density(fh, E_bin, nu_cortical, RHO_CORTICAL)
 
         # Write materials: cancellous bins (n=2)
         for idx in sorted(canc_bins):
@@ -455,7 +518,7 @@ def write_material_blocks(fh):
             fh.write(",\n")
 
         # Suture blocks (possibly modulus-binned)
-        _write_suture_blocks(fh)
+        _write_suture_blocks(fh, E_suture_override=_E_suture_case)
 
     elif density_override:
         # --- Density-binned mode (legacy 2-material mesh) ---
@@ -487,7 +550,7 @@ def write_material_blocks(fh):
             fh.write(f"*SOLID SECTION, ELSET=EBONE_BIN_{idx:02d}, MATERIAL=BONE_BIN_{idx:02d}\n")
             fh.write(",\n")
 
-        _write_suture_blocks(fh)
+        _write_suture_blocks(fh, E_suture_override=_E_suture_case)
 
     elif _has_layers:
         # --- Baseline 5-material mode (layered mesh, no density override) ---
@@ -521,7 +584,7 @@ def write_material_blocks(fh):
             fh.write("*SOLID SECTION, ELSET=ETOOTHROOT, MATERIAL=TOOTH_ROOT\n")
             fh.write(",\n")
 
-        _write_suture_blocks(fh)
+        _write_suture_blocks(fh, E_suture_override=_E_suture_case)
 
     else:
         # --- Baseline two-material mode (legacy mesh) ---
@@ -535,7 +598,7 @@ def write_material_blocks(fh):
             fh.write("*SOLID SECTION, ELSET=ESET_BONE, MATERIAL=BONE\n")
             fh.write(",\n")
 
-        _write_suture_blocks(fh)
+        _write_suture_blocks(fh, E_suture_override=_E_suture_case)
 
 
 # muscle resultant direction (posterior, inward, downward), normalized
@@ -597,7 +660,7 @@ for case, spec in loads.items():
             f.write("*NSET, NSET=NSET_MUSCLE_ALL\n")
             write_id_list(f, muscle_all)
 
-        write_material_blocks(f)
+        write_material_blocks(f, case_name=case, case_spec=spec)
 
         f.write("*STEP\n")
         f.write("*STATIC\n")
