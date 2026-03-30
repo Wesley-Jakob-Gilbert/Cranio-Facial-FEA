@@ -9,41 +9,78 @@
 
 Lazy-zone half-width *s* calibrated to physiological range (±15%, not ±50%).
 
-## Cyclic-load correction (Mechanostat / dynamic loading)
-Real bone remodeling is driven by **cyclic dynamic loads** (Frost's Mechanostat),
-not sustained static posture. The resting tongue-on-palate SED is too small to
-drive significant remodeling on its own; the intermittent swallowing bolus (peak
-30–50 kPa, ~2000×/day) delivers the osteogenic strain signal.
+## Fix 1: Density-normalized strain-equivalent stimulus
+Because psi ∝ E·ε² ∝ ρⁿ·ε², a naive SED stimulus over-rewards already-dense
+bone. The mechanostat senses STRAIN, not energy density, so we compute the
+dimensionless strain-equivalent ratio:
 
-Effective SED per cycle:
-  psi_eff = rest_frac * psi_rest + swallow_frac * psi_swallow_est
-where:
-  swallow_frac     = min(swallow_cycles_per_day * swallow_duration_s / 86400, 1.0)
-  rest_frac        = 1.0 - swallow_frac
-  psi_swallow_est  = psi_rest * (swallow_peak_kpa / tongue_kpa_ref)^2
-(Quadratic scaling from linear elasticity: doubling pressure → 4× SED.)
+  ε_eff / ε_ref = sqrt(psi_eff / (psi_ref * rho^n_power))
 
-## Suture softening (exponential + recovery)
-Exponential decay replaces the linear approximation:
-  E_new = E_prev * exp(-beta * excess_strain)   [loading path]
-  E_new = E_prev + recovery_rate * (E_baseline - E_prev)  [recovery, strain < thresh]
-This prevents the physically unrealistic linear collapse and models both
-progressive softening and partial secondary ossification.
+  stimulus = sqrt(psi_eff / (psi_ref * rho^n_power)) - 1.0
+
+This matches the analytical eps/eps_ref exactly under Carter-Hayes E(rho)=E0*rho^n.
+The linear ratio (psi/(psi_ref*rho^n) - 1) overestimates sensitivity at low density
+by 3-5× vs. the correct strain-equivalent (audit_3 item 2).
+
+Config: density_stimulus_sqrt: true (default; set false to revert to linear ratio)
+Audit_2 item 1 + Audit_3 item 2 combined.
+
+## Fix 2: Power-law cyclic loading (Rubin & Lanyon 1984 / Turner 1998)
+Static rest loads are biologically inert (Rubin & Lanyon 1984).  The correct
+stimulus is a power-law function of peak dynamic strain (or SED proxy) and
+cycle count, not a linear time-fraction average.
+
+  psi_eff = (swallow_cycles_per_day / ref_cycles)^(1/m) * psi_peak_swallow
+
+Where m ≈ 4 (Turner 1998; "four-thirds" power law for fatigue-like loading).
+The static rest_frac is dropped entirely.
+Audit_2 item 2.
+
+## Fix 3: Tension-only suture softening
+Sutures widen under TENSION (membrane opening), not compression.
+Von Mises stress is non-negative and includes compressive deviatoric components,
+making it physically wrong for suture-softening trigger.
+We now use max_principal_stress (s1) from elem_principal_stress.csv.
+Softening fires only when s1 > tension_threshold (Pa, defaults to 10 kPa).
+Under compressive loading (s1 <= 0) softening is suppressed; recovery proceeds.
+Audit_2 item 3.
+
+## Fix 4: Δρ rate limiter (integration stability)
+Explicit Euler integration can oscillate near stress concentrations.
+A maximum biological rate limit (|Δρ| ≤ Δρ_max per cycle, default 0.05)
+reflects osteoblast/osteoclast recruitment physiology.
+Audit_2 item 4.
+
+## Fix 5: Proper isotropic SED fallback (replaces vm²/2E)
+For isotropic materials the exact SED from the stress tensor is:
+  psi_iso = (1/2E) * [sxx² + syy² + szz² - ν(sxx·syy + syy·szz + szz·sxx)] +
+            (1/2G) * [sxy² + sxz² + syz²]
+where G = E/(2(1+ν)).
+This is only used when CalculiX ENER (elem_sed.csv) is unavailable.
+For orthotropic runs we still require elem_sed.csv — a hard warning is emitted.
+Audit_2 item 5.
+
+## Cyclic-load duty cycle (updated — see Fix 2)
+Power-law effective SED replaces linear time-fraction averaging.
+
+## Suture softening (exponential + recovery, tension-only — see Fix 3)
+Exponential decay on tension path; recovery on compressive/sub-threshold path.
 
 ## Orthotropic cortical bone (material.yaml scaffold)
 Orthotropic material constants are loaded from material.yaml if present under
-materials.cortical_ortho. The .inp files still use isotropic CORTICAL material
-unless the orthotropic flag is enabled — handled in make_inp.py. The remodeling
-loop uses the principal modulus E1 (periosteal/endosteal loading axis) for the
-SED approximation fallback.
+materials.cortical_ortho.  Orthotropic runs REQUIRE elem_sed.csv (true ENER);
+the vm²/2E fallback is disabled for orthotropic.
 
 Inputs:
 - mesh/mesh_data.json
 - configs/remodeling.yaml
+- configs/material.yaml           (optional, for orthotropic)
 - results/<scenario>/elem_vm.csv
-- results/<scenario>/elem_sed.csv  (preferred; true CalculiX ENER SED)
-- results/<scenario>/elem_density.json  (optional prior state)
-- results/<scenario>/suture_modulus.json  (optional prior state)
+- results/<scenario>/elem_sed.csv              (preferred; CalculiX ENER)
+- results/<scenario>/elem_stress_tensor.csv    (fallback SED; Fix 5)
+- results/<scenario>/elem_principal_stress.csv (suture softening; Fix 3)
+- results/<scenario>/elem_density.json         (optional prior state)
+- results/<scenario>/suture_modulus.json       (optional prior state)
 
 Outputs:
 - results/<scenario>/elem_density.json
@@ -61,6 +98,10 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
+# ---------------------------------------------------------------------------
+# Config & mesh helpers
+# ---------------------------------------------------------------------------
 
 def load_cfg():
     cfg = yaml.safe_load((ROOT / "configs" / "remodeling.yaml").read_text())
@@ -98,8 +139,7 @@ def load_sets(mesh: dict):
 def read_vm(path: Path) -> dict[int, float]:
     vm = {}
     with path.open("r", encoding="utf-8") as f:
-        r = csv.DictReader(f)
-        for row in r:
+        for row in csv.DictReader(f):
             vm[int(row["elem_id"])] = float(row["vm_avg_pa"])
     return vm
 
@@ -108,10 +148,44 @@ def read_sed(path: Path) -> dict[int, float]:
     """Read true strain energy density from elem_sed.csv (CalculiX ENER output)."""
     sed = {}
     with path.open("r", encoding="utf-8") as f:
-        r = csv.DictReader(f)
-        for row in r:
+        for row in csv.DictReader(f):
             sed[int(row["elem_id"])] = float(row["sed_avg_pa"])
     return sed
+
+
+def read_stress_tensor(path: Path) -> dict[int, tuple]:
+    """Read full stress tensor per element from elem_stress_tensor.csv.
+
+    Returns dict: eid → (sxx, syy, szz, sxy, sxz, syz)  [Pa]
+    Used for Fix 5: proper isotropic SED fallback.
+    """
+    tensor = {}
+    with path.open("r", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            eid = int(row["elem_id"])
+            tensor[eid] = (
+                float(row["sxx_pa"]), float(row["syy_pa"]), float(row["szz_pa"]),
+                float(row["sxy_pa"]), float(row["sxz_pa"]), float(row["syz_pa"]),
+            )
+    return tensor
+
+
+def read_principal_stress(path: Path) -> dict[int, tuple]:
+    """Read principal stresses per element from elem_principal_stress.csv.
+
+    Returns dict: eid → (s1_max, s2_mid, s3_min)  [Pa], s1 ≥ s2 ≥ s3.
+    Used for Fix 3: tension-only suture softening.
+    """
+    principal = {}
+    with path.open("r", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            eid = int(row["elem_id"])
+            principal[eid] = (
+                float(row["s1_max_pa"]),
+                float(row["s2_mid_pa"]),
+                float(row["s3_min_pa"]),
+            )
+    return principal
 
 
 def read_density(path: Path, all_eids: set[int]) -> dict[int, float]:
@@ -142,7 +216,7 @@ def update_summary(summary_path: Path, row: dict):
         "apposition_fraction", "resorption_fraction",
         "lazy_fraction", "mean_abs_drho",
         "mean_suture_E", "min_suture_E",
-        "cyclic_swallow_frac", "psi_swallow_scale",
+        "cyclic_psi_eff_scale",
     ]
     with summary_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
@@ -151,91 +225,159 @@ def update_summary(summary_path: Path, row: dict):
 
 
 # ---------------------------------------------------------------------------
-# Cyclic-load duty-cycle correction
+# Fix 5: Proper isotropic SED fallback from full stress tensor
 # ---------------------------------------------------------------------------
 
-def compute_cyclic_factors(cyclic_cfg: dict, tongue_kpa: float) -> tuple[float, float]:
-    """Return (swallow_frac, psi_scale) for the cyclic-load correction.
+def sed_from_tensor_isotropic(sxx, syy, szz, sxy, sxz, syz, E: float, nu: float) -> float:
+    """Compute exact SED for an isotropic linear elastic material from its stress tensor.
 
-    psi_scale: the factor by which the raw (static) SED is scaled to obtain
-    the effective dynamic SED seen by bone cells per unit time.
+    psi_iso = (1/2E) * [sxx² + syy² + szz²
+                        - 2ν(sxx·syy + syy·szz + szz·sxx)]
+            + (1+ν)/E * [sxy² + sxz² + syz²]
 
-    psi_eff = psi_rest * [(rest_frac) + swallow_frac * (peak_kpa/ref_kpa)^2]
+    This is derived from the compliance form: psi = σ:ε/2 = σ:C⁻¹:σ/2,
+    exact for isotropic materials regardless of loading mode.
+
+    The vm²/2E approximation corresponds to assuming pure deviatoric loading
+    and ignores the volumetric (pressure) contribution to stored energy,
+    which can be significant in constrained cranial sutures.
+    """
+    G = E / (2.0 * (1.0 + nu))
+    # Normal stress contribution (includes Poisson coupling)
+    normal = (sxx**2 + syy**2 + szz**2
+              - 2.0 * nu * (sxx*syy + syy*szz + szz*sxx)) / (2.0 * E)
+    # Shear stress contribution (factor of 2 absorbed into compliance)
+    shear = (sxy**2 + sxz**2 + syz**2) / (2.0 * G)
+    return max(0.0, normal + shear)
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: Power-law cyclic loading (Turner 1998 / Rubin & Lanyon 1984)
+# ---------------------------------------------------------------------------
+
+def compute_cyclic_psi_eff(
+    cyclic_cfg: dict,
+    tongue_kpa: float,
+    psi_rest: float,
+) -> tuple[float, float]:
+    """Return (psi_eff, scale_factor) using power-law cyclic loading correction.
+
+    Biological background:
+        Rubin & Lanyon (1984): static loads are biologically inert for osteogenesis.
+        Turner (1998): osteogenic signal ∝ (N/N_ref)^(1/m) · ε_peak (m ≈ 3–4).
+
+    Power-law formulation:
+        psi_peak = psi_rest * (swallow_peak_kpa / tongue_kpa_ref)^2  (linear elasticity)
+        psi_eff  = psi_peak * (swallow_cycles / ref_cycles)^(1/m)
+
+    Audit_3 Fix 3a — ref_cycles homeostatic normalization:
+        ref_cycles_per_day should equal the habitual swallowing rate (swallow_cycles_per_day).
+        At habitually normal activity, N/N_ref = 1 → cycle_factor = 1.0 (homeostatic neutral).
+        With old default ref_cycles=1, cycle_factor = 2000^(1/4) = 6.69× even at baseline —
+        every scenario was incorrectly amplified. Turner's ratio is N_actual/N_habitual.
+
+    Audit_3 Fix 3b — psi_ref auto-calibration:
+        After fix 3a, psi_eff = psi_rest * (peak_kpa/tongue_kpa)^2 at homeostasis (N=N_ref).
+        For the stimulus to be zero at homeostasis, psi_ref must equal this peak-swallow SED:
+          psi_ref_dynamic = psi_ref_static * (swallow_peak_kpa / tongue_kpa_ref)^2
+        This is handled in the calling code (main) when psi_ref_auto_calibrate_cyclic=True.
+
+    The static rest contribution is DROPPED (per Rubin & Lanyon 1984).
 
     Args:
-        cyclic_cfg: the 'cyclic_loading' sub-dict from remodeling.yaml
-        tongue_kpa: resting tongue pressure for this load case (kPa)
+        cyclic_cfg:  'cyclic_loading' sub-dict from remodeling.yaml
+        tongue_kpa:  resting tongue pressure for this load case (kPa)
+        psi_rest:    resting (static) SED for this element (Pa)
 
     Returns:
-        swallow_frac: fraction of day occupied by swallowing bolus
-        psi_scale: total SED multiplier (>1 when swallowing dominates)
+        psi_eff:      effective dynamic SED (Pa) seen by bone cells
+        scale_factor: psi_eff / psi_rest for logging
     """
     swallow_cycles = float(cyclic_cfg.get("swallow_cycles_per_day", 2000))
-    swallow_dur_s = float(cyclic_cfg.get("swallow_duration_s", 0.5))
     peak_kpa = float(cyclic_cfg.get("swallow_peak_kpa", 35.0))
     ref_kpa = float(cyclic_cfg.get("tongue_kpa_ref", 2.0))
+    # Audit_3 Fix 3a: ref_cycles should = habitual daily count (Turner N_0 = N_habitual).
+    # Default changed from 1.0 → swallow_cycles (homeostatic neutral: N/N_ref = 1.0).
+    # Old default of 1.0 caused 2000^(1/4) = 6.69× spurious amplification at normal activity.
+    ref_cycles = float(cyclic_cfg.get("ref_cycles_per_day", swallow_cycles))
+    m_power = float(cyclic_cfg.get("m_power", 4.0))  # Turner 1998; 3-4 range
 
-    swallow_frac = min(swallow_cycles * swallow_dur_s / 86400.0, 1.0)
-    rest_frac = 1.0 - swallow_frac
-
-    # SED scales as pressure^2 in linear elasticity (psi = sigma^2/2E)
-    if ref_kpa > 0 and tongue_kpa > 0:
+    # Peak swallow SED: scales as pressure^2 from linear elasticity
+    if tongue_kpa > 0 and ref_kpa > 0:
         pressure_ratio = peak_kpa / tongue_kpa
     elif ref_kpa > 0:
-        # mouth-breathing: tongue_kpa = 0; swallowing still occurs but is
-        # the only loading event. Use ref_kpa as denominator.
+        # Mouth-breathing: resting tongue_kpa=0, but swallowing still occurs
         pressure_ratio = peak_kpa / ref_kpa
     else:
         pressure_ratio = 1.0
 
-    psi_swallow_scale = pressure_ratio ** 2
-    psi_scale = rest_frac + swallow_frac * psi_swallow_scale
-    return swallow_frac, psi_scale
+    psi_peak = psi_rest * (pressure_ratio ** 2)
+
+    # Power-law cycle scaling (Turner 1998):
+    # More cycles amplify the signal but with diminishing returns
+    cycle_factor = (swallow_cycles / max(ref_cycles, 1.0)) ** (1.0 / m_power)
+    psi_eff = psi_peak * cycle_factor
+
+    scale_factor = psi_eff / psi_rest if psi_rest > 1e-30 else 1.0
+    return psi_eff, scale_factor
 
 
 # ---------------------------------------------------------------------------
-# Suture exponential softening + recovery
+# Fix 3: Tension-only suture softening
 # ---------------------------------------------------------------------------
 
 def update_suture_modulus(
     eid: int,
-    vm_e: float,
+    s1_max: float,           # max principal stress (Pa); positive = tension
     E_prev: float,
     E_baseline: float,
     suture_cfg: dict,
 ) -> float:
-    """Compute updated suture modulus for one element.
+    """Compute updated suture modulus for one element — TENSION-ONLY softening.
 
-    Exponential softening (replaces linear approximation):
-        E_new = E_prev * exp(-beta * excess_strain)   when strain > threshold
-    Sub-threshold recovery (partial secondary ossification):
-        E_new = E_prev + recovery_rate * (E_baseline - E_prev)  when strain <= threshold
+    Physical basis:
+        Cranial sutures are fibrous periosteal joints that widen (soften/stretch)
+        under TENSILE loading (membrane opening stress). Under compression they
+        resist and can eventually ossify (synostosis). Von Mises stress is
+        non-negative and includes compressive deviatoric contributions, making it
+        a non-physical trigger for suture softening.
+
+        Fix 3: use max_principal_stress (s1) from elem_principal_stress.csv.
+        Softening fires only when s1 > tensile_threshold (Pa).
+        When s1 ≤ 0 (compressive dominant): recovery path only.
+
+    Exponential softening on tension path:
+        E_new = E_prev * exp(-beta * (s1 - threshold) / E_prev)
+        The strain-like excess is (s1 - threshold) / E_prev (Hookean approximation).
+
+    Sub-threshold recovery (secondary ossification analog):
+        E_new = E_prev + recovery_rate * (E_baseline - E_prev)
 
     Args:
-        eid:         element id (for debug, not used in math)
-        vm_e:        von Mises stress at this element (Pa), used to estimate strain
-        E_prev:      current Young's modulus for this suture element (Pa)
-        E_baseline:  intact suture Young's modulus (Pa)
-        suture_cfg:  sub-dict from remodeling.yaml -> suture_remodeling
+        eid:          element id (debug only)
+        s1_max:       max principal stress (Pa); positive = tension
+        E_prev:       current Young's modulus for this suture element (Pa)
+        E_baseline:   intact suture Young's modulus (Pa)
+        suture_cfg:   sub-dict from remodeling.yaml -> suture_remodeling
 
     Returns:
         Updated Young's modulus (Pa), clamped to [E_min, E_baseline].
     """
     beta = float(suture_cfg.get("beta", 40.0))
     E_min = float(suture_cfg.get("E_min_pa", 1.0e7))
-    strain_thresh = float(suture_cfg.get("strain_threshold", 0.00015))
+    # Tension threshold in Pa (default 10 kPa; typical suture yield onset)
+    tension_thresh_pa = float(suture_cfg.get("tension_threshold_pa",
+                                              suture_cfg.get("strain_threshold", 0.00015) * E_baseline))
     recovery_rate = float(suture_cfg.get("recovery_rate", 0.05))
 
-    # Approximate strain from vm stress / current modulus
-    strain = vm_e / E_prev if E_prev > 0 else 0.0
-
-    if strain > strain_thresh:
-        excess = strain - strain_thresh
-        # Exponential decay: physically prevents collapse at high strains
-        E_new = E_prev * math.exp(-beta * excess)
+    if s1_max > tension_thresh_pa:
+        # Tensile opening path: exponential softening
+        # Excess stress normalized by current modulus gives a strain-like measure
+        excess_strain = (s1_max - tension_thresh_pa) / max(E_prev, 1.0)
+        E_new = E_prev * math.exp(-beta * excess_strain)
         E_new = max(E_min, min(E_baseline, E_new))
     else:
-        # Recovery toward baseline (secondary ossification analog)
+        # Compressive or sub-threshold: recovery toward baseline (ossification analog)
         E_new = E_prev + recovery_rate * (E_baseline - E_prev)
         E_new = min(E_baseline, E_new)
 
@@ -266,10 +408,21 @@ def main():
     E_suture = float(cfg["E_suture_pa"])
     E_cortical = float(cfg.get("E_cortical_pa", E_bone))
     E_cancellous = float(cfg.get("E_cancellous_pa", E_bone))
+    nu_bone = float(cfg.get("nu_bone", 0.3))        # Poisson ratio for SED Fix 5
+    nu_cancellous = float(cfg.get("nu_cancellous", 0.3))
+    nu_cortical = float(cfg.get("nu_cortical", 0.3))
 
-    # Orthotropic cortical fallback SED: use E1 (principal loading axis) if available.
-    # The vm²/2E approximation should use the stiffness axis most aligned with
-    # the primary load direction. E1 (periosteal-endosteal) is the correct choice.
+    # Fix 4: Δρ rate limiter (max biological remodeling rate per cycle)
+    drho_max = float(cfg.get("drho_max_per_cycle", 0.05))
+
+    # Fix 1 + Audit_3 Fix 2: density-normalized strain-equivalent stimulus
+    density_normalize_stimulus = bool(cfg.get("density_normalize_stimulus", True))
+    # density_stimulus_sqrt: use sqrt(psi/(psi_ref*rho^n))-1 (strain-equivalent).
+    # Linear ratio (audit_2 original) overstates sensitivity at low/high density.
+    # sqrt matches analytical eps_eff/eps_ref = sqrt(2psi/E)/sqrt(2psi_ref/E0) exactly.
+    density_stimulus_sqrt = bool(cfg.get("density_stimulus_sqrt", True))
+
+    # Orthotropic cortical: requires true ENER SED; fallback disabled for ortho.
     mat_path = ROOT / "configs" / "material.yaml"
     _ortho_cfg_rm = {}
     if mat_path.exists():
@@ -277,8 +430,7 @@ def main():
         _mat = _yaml.safe_load(mat_path.read_text())
         _ortho_cfg_rm = _mat.get("materials", {}).get("cortical_ortho", {})
     _ortho_enabled = bool(_ortho_cfg_rm.get("enabled", False))
-    # E_cortical_fallback: used for vm²/2E SED approximation when ENER not available
-    E_cortical_fallback = float(_ortho_cfg_rm.get("E1_pa", E_cortical)) if _ortho_enabled else E_cortical
+
     psi_ref_cortical = float(cfg.get("psi_ref_cortical_pa", psi_ref_global))
     psi_ref_cancellous = float(cfg.get("psi_ref_cancellous_pa", psi_ref_global))
 
@@ -290,14 +442,31 @@ def main():
         alpha_res = float(cfg["alpha"])
     lazy_s = float(cfg.get("lazy_zone_s", 0.15))
 
-    # --- Cyclic-load correction ---
+    # --- Cyclic-load config (Fix 2 + Audit_3 Fix 3) ---
     cyclic_cfg = cfg.get("cyclic_loading", {})
     cyclic_enabled = bool(cyclic_cfg.get("enabled", False))
-    if cyclic_enabled:
-        swallow_frac, psi_scale = compute_cyclic_factors(cyclic_cfg, tongue_kpa)
-        print(f"  [cyclic] swallow_frac={swallow_frac:.4f}  psi_scale={psi_scale:.3f}x")
-    else:
-        swallow_frac, psi_scale = 0.0, 1.0
+    cyclic_psi_eff_scale_log = 1.0  # for summary only
+
+    # Audit_3 Fix 3b: Auto-calibrate psi_ref to homeostatic peak-swallow SED.
+    # When cyclic loading is enabled, the effective stimulus signal is driven by
+    # peak-swallow SED, not static tongue-pressure SED. The stored psi_ref values
+    # (calibrated against static CalculiX output) are therefore too low by a factor
+    # of (swallow_peak_kpa / tongue_kpa_ref)^2, causing runaway apposition on every cycle.
+    # Fix: scale psi_ref by the same pressure ratio used in compute_cyclic_psi_eff.
+    # At homeostasis (N=N_ref), psi_eff = psi_rest*(peak/ref_kpa)^2, so
+    # psi_ref_dynamic = psi_ref_static * (peak_kpa/ref_kpa)^2 gives stimulus=0. Correct.
+    # Config: psi_ref_auto_calibrate_cyclic: true (default on; set false to revert).
+    psi_ref_auto_calibrate_cyclic = bool(cfg.get("psi_ref_auto_calibrate_cyclic", True))
+    if cyclic_enabled and psi_ref_auto_calibrate_cyclic:
+        _c_peak_kpa = float(cyclic_cfg.get("swallow_peak_kpa", 35.0))
+        _c_ref_kpa = float(cyclic_cfg.get("tongue_kpa_ref", 2.0))
+        _pressure_ratio_sq = (_c_peak_kpa / max(_c_ref_kpa, 1e-9)) ** 2
+        psi_ref_global = psi_ref_global * _pressure_ratio_sq
+        psi_ref_cortical = psi_ref_cortical * _pressure_ratio_sq
+        psi_ref_cancellous = psi_ref_cancellous * _pressure_ratio_sq
+        print(f"  [cyclic psi_ref calibration] pressure_ratio_sq={_pressure_ratio_sq:.1f}x: "
+              f"psi_ref_cortical={psi_ref_cortical:.2f} Pa, "
+              f"psi_ref_cancellous={psi_ref_cancellous:.2f} Pa")
 
     mesh = json.loads((ROOT / "mesh" / "mesh_data.json").read_text())
     all_eids, bone, suture, cortical, cancellous, tooth_root = load_sets(mesh)
@@ -309,22 +478,41 @@ def main():
     vm_path = case_dir / "elem_vm.csv"
     if not vm_path.exists():
         raise SystemExit(f"Missing {vm_path}; run solve + extract_fields first")
-
     vm = read_vm(vm_path)
 
-    # Prefer true SED from CalculiX ENER output
+    # Prefer true SED from CalculiX ENER output (Fix 5: required for ortho)
     sed_path = case_dir / "elem_sed.csv"
     sed_direct = read_sed(sed_path) if sed_path.exists() else None
     if sed_direct:
         print(f"  Using true SED from {sed_path.name} ({len(sed_direct)} elements)")
     else:
-        print(f"  Warning: {sed_path.name} not found, falling back to vm²/2E approximation")
+        if _ortho_enabled:
+            print(f"  ERROR: {sed_path.name} not found but orthotropic is enabled. "
+                  "SED approximation is physically invalid for orthotropic materials. "
+                  "Please add ENER output to your CalculiX .inp and re-run.")
+        else:
+            print(f"  Warning: {sed_path.name} not found, using isotropic tensor fallback (Fix 5)")
+
+    # Fix 5: Full stress tensor for proper isotropic SED fallback
+    tensor_path = case_dir / "elem_stress_tensor.csv"
+    stress_tensor = read_stress_tensor(tensor_path) if tensor_path.exists() else {}
+    if not sed_direct and not stress_tensor:
+        print(f"  Warning: {tensor_path.name} also missing, "
+              "falling back to deprecated vm²/2E approximation")
+
+    # Fix 3: Principal stresses for tension-only suture softening
+    principal_path = case_dir / "elem_principal_stress.csv"
+    principal_stress = read_principal_stress(principal_path) if principal_path.exists() else {}
+    if not principal_stress:
+        print(f"  Warning: {principal_path.name} not found; suture softening will use "
+              "vm-based approximation (physically non-ideal). Re-run extract_fields.py.")
 
     rho_path = case_dir / "elem_density.json"
     rho_prev = read_density(rho_path, all_eids)
 
     rho_new = {}
     delta = {}
+    psi_eff_scales = []  # for logging
 
     for eid in all_eids:
         r0 = rho_prev[eid]
@@ -338,33 +526,60 @@ def main():
         if _has_layers and eid in cortical:
             psi_ref = psi_ref_cortical
             n_pow = n_power_cortical
+            E_base = E_cortical
+            nu = nu_cortical
         elif _has_layers and eid in cancellous:
             psi_ref = psi_ref_cancellous
             n_pow = n_power_cancellous
+            E_base = E_cancellous
+            nu = nu_cancellous
         else:
             psi_ref = psi_ref_global
             n_pow = n_power
+            E_base = E_bone
+            nu = nu_bone
 
-        # Raw (static) SED
+        # --- Raw (static) SED ---
         if sed_direct and eid in sed_direct:
             psi_raw = sed_direct[eid]
+        elif stress_tensor and eid in stress_tensor and not _ortho_enabled:
+            # Fix 5: proper isotropic SED from full stress tensor
+            sxx, syy, szz, sxy, sxz, syz = stress_tensor[eid]
+            E_elem = max(1e3, E_base * (r0 ** n_pow))
+            psi_raw = sed_from_tensor_isotropic(sxx, syy, szz, sxy, sxz, syz, E_elem, nu)
         else:
+            # Legacy fallback: vm²/2E (deprecated; physically inaccurate)
             vm_e = float(vm.get(eid, 0.0))
-            if _has_layers and eid in cortical:
-                # Use E1 (principal axis) when orthotropic is enabled;
-                # otherwise fall back to scalar E_cortical.
-                E_base = E_cortical_fallback if _ortho_enabled else E_cortical
-            elif _has_layers and eid in cancellous:
-                E_base = E_cancellous
-            else:
-                E_base = E_bone
-            E_prev = max(1e3, E_base * (r0 ** n_pow))
-            psi_raw = (vm_e * vm_e) / (2.0 * E_prev)
+            E_elem = max(1e3, E_base * (r0 ** n_pow))
+            psi_raw = (vm_e * vm_e) / (2.0 * E_elem)
 
-        # Apply cyclic-load correction (scales raw static SED to effective dynamic SED)
-        psi = psi_raw * psi_scale
+        # --- Fix 2: Power-law cyclic loading correction ---
+        if cyclic_enabled:
+            psi_eff, eff_scale = compute_cyclic_psi_eff(cyclic_cfg, tongue_kpa, psi_raw)
+            psi_eff_scales.append(eff_scale)
+        else:
+            psi_eff = psi_raw
+            eff_scale = 1.0
 
-        stimulus = (psi / psi_ref) - 1.0
+        # --- Fix 1 + Audit_3 Fix 2: Density-normalized strain-equivalent stimulus ---
+        # The mechanostat senses strain, not energy density directly.
+        # Under Carter-Hayes: E(rho) = E0*rho^n, ε = sqrt(2psi/E) = sqrt(2psi/(E0*rho^n))
+        # Dimensionless stimulus (strain ratio): S = ε_eff/ε_ref - 1
+        #   = sqrt(psi_eff / (psi_ref * rho^n)) - 1   [with density_stimulus_sqrt=True]
+        # Linear form: psi_eff/(psi_ref*rho^n) - 1 overestimates sensitivity ~3-5x at
+        # physiological density ranges (audit_3 item 2).
+        if density_normalize_stimulus and r0 > 0:
+            psi_ref_norm = psi_ref * (r0 ** n_pow)
+        else:
+            psi_ref_norm = psi_ref
+
+        raw_ratio = psi_eff / max(psi_ref_norm, 1e-30)
+        if density_stimulus_sqrt:
+            # Correct strain-equivalent: sqrt(psi_ratio) - 1
+            stimulus = math.sqrt(max(0.0, raw_ratio)) - 1.0
+        else:
+            # Legacy linear ratio (audit_2; backward-compat)
+            stimulus = raw_ratio - 1.0
 
         if stimulus > lazy_s:
             drho = alpha_app * (stimulus - lazy_s)
@@ -372,6 +587,9 @@ def main():
             drho = alpha_res * (stimulus + lazy_s)
         else:
             drho = 0.0
+
+        # Fix 4: Δρ rate limiter (integration stability)
+        drho = max(-drho_max, min(drho_max, drho))
 
         r1 = min(rho_max, max(rho_min, r0 + drho))
         rho_new[eid] = r1
@@ -383,7 +601,7 @@ def main():
     snap_dir.mkdir(parents=True, exist_ok=True)
     write_density(snap_dir / f"cycle_{cycle}_density.json", rho_new)
 
-    # --- Suture modulus update (exponential softening + recovery) ---
+    # --- Fix 3: Suture modulus update (tension-only exponential softening + recovery) ---
     suture_cfg = cfg.get("suture_remodeling", {})
     suture_remod_enabled = suture_cfg.get("enabled", False)
     suture_modulus = {}
@@ -400,10 +618,17 @@ def main():
 
         for eid in suture:
             E_prev_suture = float(prior_suture_mod.get(str(eid), E_suture_baseline))
-            vm_e = float(vm.get(eid, 0.0))
+
+            # Fix 3: use max principal stress (tension) instead of vm
+            if principal_stress and eid in principal_stress:
+                s1_max = principal_stress[eid][0]  # max principal (positive = tension)
+            else:
+                # Fallback: vm-based proxy (physically non-ideal; warns above)
+                vm_e = float(vm.get(eid, 0.0))
+                s1_max = vm_e  # Conservative: vm ≥ 0 so at least won't suppress all softening
 
             E_new = update_suture_modulus(
-                eid, vm_e, E_prev_suture, E_suture_baseline, suture_cfg
+                eid, s1_max, E_prev_suture, E_suture_baseline, suture_cfg
             )
             suture_modulus[str(eid)] = E_new
 
@@ -443,6 +668,7 @@ def main():
     bone_rhos = [rho_new[eid] for eid in bone_ids]
     bone_deltas = [abs(delta[eid]) for eid in bone_ids if abs(delta[eid]) > 1e-12]
     mean_abs_drho = sum(bone_deltas) / max(1, len(bone_deltas)) if bone_deltas else 0.0
+    mean_psi_eff_scale = sum(psi_eff_scales) / max(1, len(psi_eff_scales)) if psi_eff_scales else 1.0
 
     summary_row = {
         "scenario": scenario,
@@ -454,8 +680,7 @@ def main():
         "resorption_fraction": f"{res:.6f}",
         "lazy_fraction": f"{lazy:.6f}",
         "mean_abs_drho": f"{mean_abs_drho:.6f}",
-        "cyclic_swallow_frac": f"{swallow_frac:.6f}",
-        "psi_swallow_scale": f"{psi_scale:.4f}",
+        "cyclic_psi_eff_scale": f"{mean_psi_eff_scale:.4f}",
     }
     if suture_remod_enabled and suture_modulus:
         summary_row["mean_suture_E"] = f"{mean_suture_E:.6e}"
@@ -468,7 +693,8 @@ def main():
         suture_info = f"  mean_suture_E={mean_suture_E:.4e}  min_suture_E={min_suture_E:.4e}"
 
     print(
-        f"[remodel] {scenario} cycle {cycle} (tongue={tongue_kpa}kPa psi_scale={psi_scale:.2f}x): "
+        f"[remodel] {scenario} cycle {cycle} (tongue={tongue_kpa}kPa "
+        f"psi_eff_scale={mean_psi_eff_scale:.2f}x): "
         f"mean_rho={sum(bone_rhos)/len(bone_rhos):.4f}  "
         f"app={app:.1%}  res={res:.1%}  lazy={lazy:.1%}  "
         f"mean|drho|={mean_abs_drho:.6f}{suture_info}"

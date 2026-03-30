@@ -1,36 +1,30 @@
-# Python
-__pycache__/
-*.pyc
 
-# Virtual envs
-.venv/
-venv/
-
-# System
-.DS_Store
-
-# Generated solver/runtime artifacts
-results/**
 !results/.gitkeep
-
-# Optional local notes
-NEXT_BLOCKERS.md
-
-# Runtime artifacts (transient, not source of truth)
-solver/elem_density.json
-
 # Agent coordination files — local only, not for public repo
-AGENT_COMMS*.md
-TASK_BOARD.md
-PLAN.md
-CLAUDE.md
-.claude/
-
+# Generated solver/runtime artifacts
 # Miscellaneous Agent Artifacts
-PUBLISH_CHECKLIST.md
-WORKLOG.md
-MORNING_UPDATE.md
-ASSUMPTIONS_LIMITATIONS.md
-
+# Optional local notes
+# Python
+# Runtime artifacts (transient, not source of truth)
+# System
 # User miscellaneous artifacts
+# Virtual envs
+*.pyc
+.DS_Store
+.claude/
+.venv/
+AGENT_COMMS*.md
+ASSUMPTIONS_LIMITATIONS.md
+CLAUDE.md
+MORNING_UPDATE.md
+NEXT_BLOCKERS.md
+PLAN.md
+PUBLISH_CHECKLIST.md
+TASK_BOARD.md
 ThingsToLearn.mdAUDIT_REPORT.md
+WORKLOG.md
+__pycache__/
+audit_*.md
+results/**
+solver/elem_density.json
+venv/
