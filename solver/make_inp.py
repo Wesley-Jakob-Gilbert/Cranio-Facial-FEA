@@ -51,6 +51,7 @@ if "materials" in mat_cfg:
     nu_cancellous = float(mats["cancellous"]["poisson_ratio"]) if "cancellous" in mats else nu_bone
     E_tooth_root = float(mats["tooth_root"]["youngs_modulus_pa"]) if "tooth_root" in mats else 2.0e10
     nu_tooth_root = float(mats["tooth_root"]["poisson_ratio"]) if "tooth_root" in mats else 0.31
+
 else:
     leg = mat_cfg["material"]
     E_bone = float(leg["youngs_modulus_pa"])
@@ -63,6 +64,11 @@ else:
     nu_cancellous = nu_bone
     E_tooth_root = 2.0e10
     nu_tooth_root = 0.31
+
+# Orthotropic cortical bone (optional; disabled unless cortical_ortho.enabled=true)
+_ortho_cfg = mat_cfg.get("materials", {}).get("cortical_ortho", {})
+USE_ORTHO_CORTICAL = bool(_ortho_cfg.get("enabled", False))
+
 
 # Physical mass densities for gravity loading (kg/m³)
 RHO_CORTICAL = 1900.0
@@ -303,10 +309,28 @@ def _bin_elements(elem_list, density_map, rho_lo, rho_hi, bin_width, prefix):
     return {i: v for i, v in bins.items() if v}
 
 
-def _write_elastic_density(fh, E, nu, rho_mass):
-    """Write *ELASTIC and *DENSITY cards for a material."""
-    fh.write("*ELASTIC\n")
-    fh.write(f"{E:.6e}, {nu:.6f}\n")
+def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
+    """Write *ELASTIC (isotropic or orthotropic) and *DENSITY cards.
+
+    If ortho dict is provided (and not None), writes TYPE=ORTHO card.
+    CalculiX ORTHO format (single line, 9 values):
+      E1, E2, nu12, E3, nu13, nu23, G12, G13, G23
+    """
+    if ortho:
+        E1  = float(ortho["E1_pa"])
+        E2  = float(ortho["E2_pa"])
+        E3  = float(ortho["E3_pa"])
+        G12 = float(ortho["G12_pa"])
+        G13 = float(ortho["G13_pa"])
+        G23 = float(ortho["G23_pa"])
+        nu12 = float(ortho["nu12"])
+        nu13 = float(ortho["nu13"])
+        nu23 = float(ortho["nu23"])
+        fh.write("*ELASTIC, TYPE=ORTHO\n")
+        fh.write(f"{E1:.6e}, {E2:.6e}, {nu12:.6f}, {E3:.6e}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e}, {G23:.6e}\n")
+    else:
+        fh.write("*ELASTIC\n")
+        fh.write(f"{E:.6e}, {nu:.6f}\n")
     fh.write("*DENSITY\n")
     fh.write(f"{rho_mass:.1f}\n")
 
@@ -478,7 +502,8 @@ def write_material_blocks(fh):
             write_id_list(fh, eset_tooth_root)
 
         fh.write("*MATERIAL, NAME=CORTICAL\n")
-        _write_elastic_density(fh, E_cortical, nu_cortical, RHO_CORTICAL)
+        _write_elastic_density(fh, E_cortical, nu_cortical, RHO_CORTICAL,
+                               ortho=_ortho_cfg if USE_ORTHO_CORTICAL else None)
 
         fh.write("*MATERIAL, NAME=CANCELLOUS\n")
         _write_elastic_density(fh, E_cancellous, nu_cancellous, RHO_CANCELLOUS)

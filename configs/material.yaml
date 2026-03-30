@@ -22,3 +22,30 @@ materials:
   tooth_root:
     youngs_modulus_pa: 2.0e10
     poisson_ratio: 0.31
+
+# --- ORTHOTROPIC CORTICAL BONE (scaffold; disabled by default) ---
+# Enable by setting materials.cortical_ortho.enabled: true and running
+# make_inp.py with --ortho flag (future work). Constants from Turner 1999
+# (mandibular cortical plate, periosteal axis = 1, endosteal = 2, axial = 3).
+# Units: Pa
+#
+# Cortical bone is strongly orthotropic: E1 (longitudinal/periosteal loading
+# axis) is ~50% stiffer than E2/E3. The current isotropic model underestimates
+# stiffness along the principal load path and overestimates transverse stiffness.
+  cortical_ortho:
+    enabled: false
+    # Principal moduli (Pa)
+    E1_pa: 2.0e10   # longitudinal (periosteal-endosteal) — principal loading axis
+    E2_pa: 1.3e10   # transverse (mesiodistal)
+    E3_pa: 1.1e10   # axial (inferosuperior)
+    # Shear moduli (Pa)
+    G12_pa: 4.5e9
+    G13_pa: 3.5e9
+    G23_pa: 3.0e9
+    # Poisson's ratios
+    nu12: 0.30
+    nu13: 0.32
+    nu23: 0.28
+    # CalculiX requires *ELASTIC, TYPE=ORTHO
+    # Format: E1 E2 nu12 E3 nu13 nu23 G12 G13 G23
+    # See CalculiX 2.21 manual §6.5 for ordering.

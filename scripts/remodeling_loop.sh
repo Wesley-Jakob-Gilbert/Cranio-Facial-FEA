@@ -17,12 +17,29 @@ print(int(cfg.get('cycles',12)))
 PY
 )"
 
+# Load tongue_kpa for each scenario from loads.yaml
+get_tongue_kpa() {
+  local scenario="$1"
+  python3 - <<PY
+import yaml, pathlib
+loads = yaml.safe_load((pathlib.Path('configs/loads.yaml')).read_text())
+case = loads.get('load_cases', {}).get('$scenario', {})
+if isinstance(case, dict):
+    print(float(case.get('tongue_kpa', 2.0)))
+else:
+    print(2.0)
+PY
+}
+
 # initialize fresh summary for this run
 rm -f results/remodeling_summary.csv
 
 for scenario in "${SCENARIOS[@]}"; do
   echo "=== Scenario: $scenario ==="
   mkdir -p "results/$scenario/snapshots"
+
+  TONGUE_KPA="$(get_tongue_kpa "$scenario")"
+  echo "  tongue_kpa=$TONGUE_KPA (used for cyclic-load SED correction)"
 
   # reset per-scenario evolving state
   rm -f "results/$scenario/elem_density.json"
@@ -38,7 +55,8 @@ for scenario in "${SCENARIOS[@]}"; do
     python3 solver/make_inp.py
     ./solver/run_case.sh "$scenario"
     python3 post/extract_fields.py
-    python3 post/bone_remodeling.py "$scenario" "$cycle"
+    # Pass tongue_kpa for cyclic SED weighting
+    python3 post/bone_remodeling.py "$scenario" "$cycle" "$TONGUE_KPA"
   done
 done
 
