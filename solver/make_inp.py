@@ -171,6 +171,7 @@ if SUTURE_MOD_PATH.exists():
 nodes = {int(k): v for k, v in mesh["nodes"].items()}
 elems = {int(k): v for k, v in mesh["elements"].items()}
 sets = mesh["sets"]
+elem_type = mesh.get("elem_type", "C3D8")  # C3D8 (hex) or C3D4 (tet)
 
 fixed = sets["NSET_FIXED"]
 palate = sets["NSET_PALATE"]
@@ -210,14 +211,26 @@ def _quad_cross(p):
     ]
 
 
-def _oral_face(conn, palate_set):
-    """Return the oral-surface face of a C3D8 element, or None.
+def _tri_cross(p):
+    """Return cross product of triangle edges (p[1]-p[0]) x (p[2]-p[0]).
 
-    For v2 (palate at k=0), the oral face is conn[:4] (k-low).
-    For v1 (palate at k=nz), the oral face is conn[4:8] (k-high).
-    Returns the face whose 4 nodes are all in palate_set, or None if
-    neither face qualifies (element is not on the oral surface).
+    The magnitude equals twice the triangle area.
     """
+    d1 = [p[1][c] - p[0][c] for c in range(3)]
+    d2 = [p[2][c] - p[0][c] for c in range(3)]
+    return [
+        d1[1] * d2[2] - d1[2] * d2[1],
+        d1[2] * d2[0] - d1[0] * d2[2],
+        d1[0] * d2[1] - d1[1] * d2[0],
+    ]
+
+
+# Tet face local indices (4 triangular faces of a C3D4)
+_TET_FACE_LOCAL = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+
+
+def _oral_face_hex(conn, palate_set):
+    """Return the oral-surface face of a C3D8 hex element, or None."""
     lo = conn[:4]
     if all(n in palate_set for n in lo):
         return lo
@@ -225,6 +238,38 @@ def _oral_face(conn, palate_set):
     if all(n in palate_set for n in hi):
         return hi
     return None
+
+
+def _oral_face_tet(conn, palate_set):
+    """Return an oral-surface face of a C3D4 tet element, or None.
+
+    Checks all 4 triangular faces; returns the first whose 3 nodes
+    are all in palate_set.
+    """
+    for idx in _TET_FACE_LOCAL:
+        face = [conn[i] for i in idx]
+        if all(n in palate_set for n in face):
+            return face
+    return None
+
+
+def _oral_face(conn, palate_set):
+    """Return the oral-surface face of an element, or None.
+
+    Dispatches to hex or tet version based on connectivity length.
+    """
+    if len(conn) == 8:
+        return _oral_face_hex(conn, palate_set)
+    elif len(conn) == 4:
+        return _oral_face_tet(conn, palate_set)
+    return None
+
+
+def _face_cross(p):
+    """Cross product for a face (quad or triangle)."""
+    if len(p) == 4:
+        return _quad_cross(p)
+    return _tri_cross(p)
 
 
 def _oral_surface_area(nodes, elems, eset_all, palate_set):
@@ -240,7 +285,7 @@ def _oral_surface_area(nodes, elems, eset_all, palate_set):
         if face is None:
             continue
         p = [nodes[n] for n in face]
-        cx = _quad_cross(p)
+        cx = _face_cross(p)
         total += 0.5 * math.sqrt(sum(c * c for c in cx))
     return total
 
@@ -275,7 +320,7 @@ def _palate_node_normals(nodes, elems, eset_all, palate_set):
         if face is None:
             continue
         p = [nodes[n] for n in face]
-        cx = _quad_cross(p)
+        cx = _face_cross(p)
 
         # Ensure normal points into bone (positive z direction on average).
         # The palatal vault means z isn't purely vertical, but across the
@@ -375,8 +420,9 @@ def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
     """Write *ELASTIC (isotropic or orthotropic) and *DENSITY cards.
 
     If ortho dict is provided (and not None), writes TYPE=ORTHO card.
-    CalculiX ORTHO format (single line, 9 values):
-      E1, E2, nu12, E3, nu13, nu23, G12, G13, G23
+    CalculiX ORTHO format (two lines, max 8 values per line):
+      Line 1: E1, E2, nu12, E3, nu13, nu23, G12, G13
+      Line 2: G23
     """
     if ortho:
         E1  = float(ortho["E1_pa"])
@@ -389,7 +435,8 @@ def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
         nu13 = float(ortho["nu13"])
         nu23 = float(ortho["nu23"])
         fh.write("*ELASTIC, TYPE=ORTHO\n")
-        fh.write(f"{E1:.6e}, {E2:.6e}, {nu12:.6f}, {E3:.6e}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e}, {G23:.6e}\n")
+        fh.write(f"{E1:.6e}, {E2:.6e}, {nu12:.6f}, {E3:.6e}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e},\n")
+        fh.write(f"{G23:.6e}\n")
     else:
         fh.write("*ELASTIC\n")
         fh.write(f"{E:.6e}, {nu:.6f}\n")
@@ -676,7 +723,7 @@ for case, spec in loads.items():
         for nid, (x, y, z) in nodes.items():
             f.write(f"{nid}, {x:.8f}, {y:.8f}, {z:.8f}\n")
 
-        f.write("*ELEMENT, TYPE=C3D8, ELSET=EALL\n")
+        f.write(f"*ELEMENT, TYPE={elem_type}, ELSET=EALL\n")
         for eid, conn in elems.items():
             f.write(f"{eid}, {', '.join(str(n) for n in conn)}\n")
 
@@ -739,12 +786,14 @@ for case, spec in loads.items():
         f.write("*NODE FILE\n")
         f.write("U\n")
         f.write("*EL FILE\n")
-        f.write("S, ENER\n")
+        f.write("S, E, ENER\n")
 
         f.write("*NODE PRINT, NSET=NALL\n")
         f.write("U\n")
         f.write("*EL PRINT, ELSET=EALL\n")
         f.write("S\n")
+        f.write("*EL PRINT, ELSET=EALL\n")
+        f.write("E\n")
         f.write("*EL PRINT, ELSET=EALL\n")
         f.write("ENER\n")
         f.write("*END STEP\n")

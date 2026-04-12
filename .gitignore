@@ -4,6 +4,9 @@ __pycache__/
 .venv/
 venv/
 
+# CT mesh dataset (large, downloaded via pipeline)
+data/
+
 # System
 .DS_Store
 .claude/
@@ -13,9 +16,23 @@ results/**
 !results/.gitkeep
 !results/comparison_animation.gif
 
+# Generated mesh data (regenerated via build_mesh.py / build_mesh_ct.py)
+mesh/mesh_data.json
+
+# Generated solver input decks (regenerated via make_inp.py)
+solver/*.inp
+
 # Runtime solver artifacts
 solver/elem_density.json
 solver/suture_modulus.json
+
+# CalculiX solver outputs
+solver/*.frd
+solver/*.dat
+solver/*.sta
+solver/*.cvg
+solver/*.12d
+solver/spooles.out
 
 # AI agent coordination / session artifacts
 AGENT_COMMS*.md
@@ -33,5 +50,6 @@ WORKLOG.md
 audit_*.md
 *.bak_audit*
 
-# CalculiX stray outputs (from --help or aborted runs)
+# CalculiX stray outputs (from --help, --version, or aborted runs)
 --help.*
+--version.*

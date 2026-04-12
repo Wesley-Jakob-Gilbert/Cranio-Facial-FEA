@@ -60,6 +60,20 @@ This is only used when CalculiX ENER (elem_sed.csv) is unavailable.
 For orthotropic runs we still require elem_sed.csv — a hard warning is emitted.
 Audit_2 item 5.
 
+## Fix 6: Dynamic strain-based suture softening threshold (Audit_5)
+The prior implementation set:
+  tension_thresh_pa = strain_threshold * E_baseline  (constant Pa)
+As a suture softened (E_prev << E_baseline), internal stress dropped below this
+fixed threshold even under large strains → premature arrest + numerical oscillation.
+Fix: threshold is now computed dynamically each call:
+  current_tension_thresh_pa = strain_threshold * E_prev
+This makes the effective trigger condition strain-invariant:
+  s1 / E_prev > strain_threshold  (ε_approx > threshold)
+which is physically correct — suture mechanoreceptors sense stretch, not absolute force.
+Config: suture_remodeling.strain_threshold (default 0.00015 = 150 µε).
+Note: legacy tension_threshold_pa (absolute Pa) is no longer used; use strain_threshold.
+Audit_5.
+
 ## Cyclic-load duty cycle (updated — see Fix 2)
 Power-law effective SED replaces linear time-fraction averaging.
 
@@ -433,9 +447,31 @@ def update_suture_modulus(
         Softening fires only when s1 > tensile_threshold (Pa).
         When s1 ≤ 0 (compressive dominant): recovery path only.
 
+    Audit_5 Fix: Dynamic strain-based threshold (replaces fixed E_baseline threshold)
+    ─────────────────────────────────────────────────────────────────────────────
+    The previous implementation computed:
+        tension_thresh_pa = strain_threshold * E_baseline  (FIXED, Pa)
+
+    As the suture softens (E_prev << E_baseline), Hookean stress s1 ≈ ε * E_prev drops
+    proportionally. The FIXED threshold demanded exponentially more strain to trigger
+    further softening (ratio E_baseline/E_prev can reach 100–1000× at typical softening).
+    This caused premature remodeling arrest and oscillation (soften → stress drops below
+    threshold → ossify → stiffen → stress spikes → soften).
+
+    Biologically, suture cells sense STRAIN (membrane stretch), not absolute force.
+    Fix: threshold is computed dynamically against E_prev so that the effective strain
+    threshold remains constant regardless of current stiffness:
+
+        current_tension_thresh_pa = strain_threshold * max(E_prev, 1.0)
+
+    This makes the trigger condition equivalent to:
+        s1 / E_prev > strain_threshold   i.e.   ε_approx > strain_threshold
+
+    which is physically invariant to softening state.
+
     Exponential softening on tension path:
-        E_new = E_prev * exp(-beta * (s1 - threshold) / E_prev)
-        The strain-like excess is (s1 - threshold) / E_prev (Hookean approximation).
+        excess_strain = (s1 - current_threshold) / E_prev
+        E_new = E_prev * exp(-beta * excess_strain)
 
     Sub-threshold recovery (secondary ossification analog):
         E_new = E_prev + recovery_rate * (E_baseline - E_prev)
@@ -448,19 +484,24 @@ def update_suture_modulus(
         suture_cfg:   sub-dict from remodeling.yaml -> suture_remodeling
 
     Returns:
-        Updated Young's modulus (Pa), clamped to [E_min, E_baseline].
+        Updated Young's modulus (Pa), clamped to [E_min, E_bone_max].
     """
     beta = float(suture_cfg.get("beta", 40.0))
     E_min = float(suture_cfg.get("E_min_pa", 1.0e7))
-    # Tension threshold in Pa (default 10 kPa; typical suture yield onset)
-    tension_thresh_pa = float(suture_cfg.get("tension_threshold_pa",
-                                              suture_cfg.get("strain_threshold", 0.00015) * E_baseline))
     recovery_rate = float(suture_cfg.get("recovery_rate", 0.05))
 
-    if s1_max > tension_thresh_pa:
+    # Audit_5 Fix: Dynamic strain threshold — constant in strain space, not stress space.
+    # strain_threshold default: 150 µε (0.00015) — typical fibrous suture yield onset.
+    # NOTE: tension_threshold_pa (legacy absolute Pa value) is deliberately ignored here;
+    # use strain_threshold to configure yield onset as a dimensionless strain fraction.
+    strain_threshold = float(suture_cfg.get("strain_threshold", 0.00015))
+    # Dynamic threshold tracks current stiffness: Pa = strain × E_prev
+    current_tension_thresh_pa = strain_threshold * max(E_prev, 1.0)
+
+    if s1_max > current_tension_thresh_pa:
         # Tensile opening path: exponential softening
-        # Excess stress normalized by current modulus gives a strain-like measure
-        excess_strain = (s1_max - tension_thresh_pa) / max(E_prev, 1.0)
+        # Excess stress normalized by current modulus gives the true excess strain
+        excess_strain = (s1_max - current_tension_thresh_pa) / max(E_prev, 1.0)
         E_new = E_prev * math.exp(-beta * excess_strain)
         E_new = max(E_min, min(E_baseline, E_new))
     else:
@@ -468,8 +509,6 @@ def update_suture_modulus(
         # Audit_4 Fix 2: sutures under sustained compression or disuse don't merely
         # recover to the fibrous baseline — they OSSIFY (synostosis).
         # Mineralization drives E toward E_bone_max_pa (1-5 GPa, configurable).
-        # Rate: recovery_rate drives both the fibrous recovery and the ossification
-        # slope; ossification rate is typically slower (ossification_rate_factor < 1).
         E_bone_max = float(suture_cfg.get("E_bone_max_pa", 5.0e9))  # 5 GPa ossified suture
         ossification_rate = float(suture_cfg.get("ossification_rate_factor", 0.2)) * recovery_rate
         if s1_max <= 0:
@@ -477,7 +516,7 @@ def update_suture_modulus(
             target = E_bone_max
             rate = ossification_rate
         else:
-            # Sub-threshold tensile (0 < s1 ≤ threshold): recover to fibrous baseline
+            # Sub-threshold tensile (0 < s1 ≤ current_threshold): recover to fibrous baseline
             target = E_baseline
             rate = recovery_rate
         E_new = E_prev + rate * (target - E_prev)

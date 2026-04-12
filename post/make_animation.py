@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Create remodeling density evolution animations.
 
-Uses Poly3DCollection to render the oral (k=0) surface of the mesh as
-solid filled quads instead of a scatter-plot point cloud.  Each quad is
-coloured by its element's density delta from baseline.
+Uses Poly3DCollection to render the oral surface of the mesh as
+solid filled polygons (quads for C3D8 hex, triangles for C3D4 tet).
+Each face is coloured by its element's density delta from baseline.
 
 Outputs:
 - results/mewing/density_evolution.gif
@@ -31,13 +31,16 @@ SCENARIOS = ("mewing", "mouth_breathing")
 # Mesh loading — oral surface faces
 # ---------------------------------------------------------------------------
 
+_TET_FACE_LOCAL = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+
+
 def load_oral_surface():
     """Return oral-surface face data for Poly3DCollection rendering.
 
     Returns
     -------
-    face_verts : ndarray, shape (N_faces, 4, 3)
-        Quad vertex coordinates for each oral-surface face.
+    face_verts : ndarray, shape (N_faces, V, 3) — V=4 for hex, 3 for tet
+        Polygon vertex coordinates for each oral-surface face.
     face_eids : list[int]
         Element id for each face (same order as face_verts).
     suture_mid_mask : ndarray[bool]
@@ -49,13 +52,12 @@ def load_oral_surface():
     nodes = {int(k): v for k, v in mesh["nodes"].items()}
     elems = {int(k): v for k, v in mesh["elements"].items()}
     sets = mesh.get("sets", {})
+    et = mesh.get("elem_type", "C3D8")
 
     palate_set = set(sets.get("NSET_PALATE", []))
     s_mid = set(sets.get("ESET_SUTURE_MID", []))
     s_lat = set(sets.get("ESET_SUTURE_LAT", []))
 
-    # Oral surface = element faces where all 4 bottom-face nodes are in NSET_PALATE.
-    # For C3D8 hex, the first 4 nodes in the connectivity list form one face.
     face_verts_list = []
     face_eids = []
     mid_mask = []
@@ -63,15 +65,33 @@ def load_oral_surface():
 
     for eid in sorted(elems.keys()):
         conn = elems[eid]
-        bottom_face = conn[:4]  # nodes 0-3 of C3D8
-        if all(n in palate_set for n in bottom_face):
-            verts = [nodes[n] for n in bottom_face]
-            face_verts_list.append(verts)
-            face_eids.append(eid)
-            mid_mask.append(eid in s_mid)
-            lat_mask.append(eid in s_lat)
+        if et == "C3D4":
+            # Tet: check all 4 triangular faces
+            for idx in _TET_FACE_LOCAL:
+                face = [conn[i] for i in idx]
+                if all(n in palate_set for n in face):
+                    face_verts_list.append([nodes[n] for n in face])
+                    face_eids.append(eid)
+                    mid_mask.append(eid in s_mid)
+                    lat_mask.append(eid in s_lat)
+                    break  # at most one oral face per tet
+        else:
+            # Hex: bottom face conn[:4], top face conn[4:8]
+            bottom_face = conn[:4]
+            if all(n in palate_set for n in bottom_face):
+                face_verts_list.append([nodes[n] for n in bottom_face])
+                face_eids.append(eid)
+                mid_mask.append(eid in s_mid)
+                lat_mask.append(eid in s_lat)
+                continue
+            top_face = conn[4:8]
+            if all(n in palate_set for n in top_face):
+                face_verts_list.append([nodes[n] for n in top_face])
+                face_eids.append(eid)
+                mid_mask.append(eid in s_mid)
+                lat_mask.append(eid in s_lat)
 
-    face_verts = np.array(face_verts_list, dtype=float)  # (N, 4, 3)
+    face_verts = np.array(face_verts_list, dtype=float)
     return face_verts, face_eids, np.array(mid_mask), np.array(lat_mask)
 
 
