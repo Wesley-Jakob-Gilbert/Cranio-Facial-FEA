@@ -1,5 +1,5 @@
 {
-  "profile": "template_maxilla_v2",
+  "profile": "ct_maxilla",
 
   "dimensions_m": {
     "Lx": 0.08,
@@ -31,6 +31,18 @@
     "nx": 44,
     "ny": 12,
     "nz": 4
+  },
+
+  "ct_mesh": {
+    "msh_path": "data/open_full_jaw/extracted/Patient_3/output/maxilla/volumetric_meshes/maxilla_volumetric_mesh.msh",
+    "scale_to_m": 0.001,
+    "palate_normal_z_threshold": -0.3,
+    "palate_z_lo_percentile": 35,
+    "palate_z_hi_percentile": 85,
+    "fixed_posterior_tolerance_m": 0.002,
+    "suture_mid_half_width_m": 0.001,
+    "suture_lat_y_threshold_m": 0.025,
+    "suture_lat_x_threshold_frac": 0.85
   },
 
   "tooth_roots": {

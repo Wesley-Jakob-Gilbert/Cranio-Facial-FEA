@@ -11,18 +11,18 @@ A computational pipeline that models how sustained tongue-on-palate posture ("me
 
 ![Mewing vs Mouth Breathing — 12-cycle density evolution](results/comparison_animation.gif)
 
-*Left: mewing (2 kPa sustained tongue load). Right: mouth breathing (gravity only, no palatal load). Color = bone relative density; 12 remodeling cycles.*
+*Left: mewing (2 kPa sustained tongue load on palatal vault). Right: mouth breathing (gravity only, no palatal load). Color = &Delta;&rho; from baseline; 12 remodeling cycles on CT-derived maxillary mesh.*
 
 ---
 
 ## Key Results
 
-| Scenario | 12-Cycle Density Trend | Interpretation |
+| Scenario | 12-Cycle Surface Trend | Interpretation |
 |----------|----------------------|----------------|
-| **Mewing** (2 kPa tongue load) | &rho; rises from 1.00 &rarr; 1.04 (55% apposition, 15% resorption) | Mechanical stimulus drives net bone formation |
-| **Mouth breathing** (gravity only) | &rho; decays from 1.00 &rarr; 0.99 (100% resorption) | Disuse-driven resorption under absent palatal load |
+| **Mewing** (2 kPa tongue load) | Localized bone formation on palatal vault (max &Delta;&rho; &asymp; +0.19), less overall surface resorption | Tongue pressure drives anabolic stimulus at the palate |
+| **Mouth breathing** (gravity only) | Uniform surface resorption, no localized formation | Absent palatal load produces disuse-driven bone loss |
 
-The divergence is consistent with Wolff's law and the mechanostat hypothesis: loaded bone strengthens, unloaded bone weakens.
+The divergence is consistent with Wolff's law and the mechanostat hypothesis: loaded bone strengthens, unloaded bone weakens. The spatial pattern — formation concentrated where the tongue contacts the palate — matches the expected mechanical stimulus distribution.
 
 ---
 
@@ -30,15 +30,14 @@ The divergence is consistent with Wolff's law and the mechanostat hypothesis: lo
 
 ### Geometry
 
-An analytic U-shaped maxillary arch mesh (2,925 nodes, 2,112 C3D8 hexahedral elements) with five material zones:
+CT-derived maxillary mesh from the [Open-Full-Jaw](https://doi.org/10.1038/s41597-024-03838-0) dataset (Patient 3): **184,617 nodes, 853,068 C3D4 tetrahedral elements**. The volumetric mesh is spatially labeled into material zones via boundary-face and centroid heuristics:
 
-- **Cortical bone** (746 elements) — surface layers, E = 15 GPa
-- **Cancellous bone** (746 elements) — interior layers, E = 0.5 GPa
-- **Tooth root dentin** (340 elements) — anatomical tooth positions, E = 20 GPa
-- **Midpalatal suture** (176 elements) — compliant midline zone, E = 50 MPa
-- **Lateral sutures** (104 elements) — bilateral compliant zones, E = 50 MPa
+- **Cortical bone** (139,362 elements) — surface layer (elements with boundary faces), E = 15 GPa
+- **Cancellous bone** (694,073 elements) — interior bone, E = 0.5 GPa
+- **Midpalatal suture** (17,033 elements) — compliant sagittal midplane zone, E = 50 MPa
+- **Lateral sutures** (2,600 elements) — anterior-lateral compliant zones, E = 50 MPa
 
-Arch dimensions: 48 mm depth, 38 mm width, 13 mm palatal vault, 3 mm bone thickness. The geometry is parametrically generated (not CT-derived) with anatomical features including palatal vault curvature, alveolar ridge elevation, posterior arm flare, and variable bone thickness.
+A parametric template mesh (2,112 C3D8 hex elements) is also available for fast iteration via the `profile` setting in `configs/geometry.json`.
 
 ### Loading
 
@@ -49,7 +48,7 @@ Arch dimensions: 48 mm depth, 38 mm width, 13 mm palatal vault, 3 mm bone thickn
 
 ### Solver
 
-[CalculiX](http://www.dhondt.de/) linear static solver (C3D8 elements, isotropic elastic materials). Each remodeling cycle runs a full FEA solve, extracts element-level strain energy density from CalculiX ENER output, then updates density.
+[CalculiX](http://www.dhondt.de/) linear static solver (C3D4 tetrahedral elements, isotropic elastic materials). Each remodeling cycle runs a full FEA solve (~62 s on the 853k-element mesh), extracts element-level strain energy density from CalculiX ENER output, then updates density.
 
 ### Remodeling Law
 
@@ -87,7 +86,13 @@ This runs mesh generation, all solver cases, field extraction, remodeling loop, 
 ### Step-by-Step
 
 ```bash
-python3 mesh/build_mesh.py              # Generate mesh (mesh/mesh_data.json)
+# CT mesh (default — requires meshio: pip install meshio)
+python3 mesh/build_mesh_ct.py           # Convert CT .msh → mesh/mesh_data.json
+
+# Or template mesh (fast, no external data needed)
+python3 mesh/build_mesh.py              # Generate parametric mesh_data.json
+
+# Pipeline
 python3 solver/make_inp.py              # Generate CalculiX .inp decks
 ./solver/run_case.sh mewing             # Solve a single case
 python3 post/extract_fields.py          # Extract displacement + stress + SED fields
@@ -130,26 +135,26 @@ results/          Generated outputs (gitignored except comparison GIF; reproduce
 
 ## Mesh Quality
 
-The v2 mesh passes all quality checks (run `python3 scripts/mesh_quality_report.py`):
+The CT mesh (run `python3 scripts/mesh_quality_report.py`):
 
 | Metric | Value |
 |--------|-------|
-| Elements | 2,112 (C3D8 hex) |
-| Negative Jacobians | 0 |
-| Aspect ratio (P95) | 3.74 |
-| Scaled Jacobian (mean) | 0.94 |
+| Elements | 853,068 (C3D4 tet) |
+| Nodes | 184,617 |
+| Source | Open-Full-Jaw Patient 3 |
+| Degenerate tets removed | ~0 (volume filter at build time) |
 
 ---
 
 ## Limitations
 
-This model is intentionally simplified to explore the **directional hypothesis** that tongue posture affects maxillary bone remodeling. Key limitations:
+This model explores the **directional hypothesis** that tongue posture affects maxillary bone remodeling. Key limitations:
 
-- Geometry is analytic (not CT-derived) — stress magnitudes are not anatomically calibrated
-- Material is isotropic linear elastic (cortical/cancellous split by layer position, not microstructural anisotropy)
+- Material is isotropic linear elastic (cortical/cancellous split by boundary-face heuristic, not microstructural anisotropy)
 - Remodeling parameters are from hip/spine literature, not validated for craniofacial bone
 - Suture biology is modeled as mechanical compliance only, not cellular response
 - Mouth-breathing scenario includes only gravity — no baseline masticatory loading
+- Element set labeling (sutures, cortical/cancellous) uses spatial heuristics, not manual segmentation
 
 For a thorough discussion, see [docs/SCIENTIFIC_CAVEATS.md](docs/SCIENTIFIC_CAVEATS.md).
 
@@ -157,10 +162,10 @@ For a thorough discussion, see [docs/SCIENTIFIC_CAVEATS.md](docs/SCIENTIFIC_CAVE
 
 ## Future Directions
 
-- CT-derived mesh from open-source maxillary scan data
-- FEBio or nonlinear solver integration for large-deformation suture mechanics
+- FEBio or nonlinear solver integration for large-deformation suture mechanics (GPU-accelerated via CUDA)
 - Transversely isotropic cortical bone material model
 - Baseline masticatory loading for the mouth-breathing comparison
+- Multi-patient mesh comparison across Open-Full-Jaw dataset
 - Parameter sensitivity dashboard across remodeling constants
 
 ---

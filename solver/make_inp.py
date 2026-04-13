@@ -105,6 +105,28 @@ def _scale_ortho(ortho_cfg: dict, rho: float, n: float) -> dict:
 
 
 
+
+
+def _continuous_E_from_rho(rho: float, E_cortical: float, n_cortical: float,
+                             n_cancellous: float, rho_t: float,
+                             enforce_c0: bool = True,
+                             E_cancellous_explicit: float = 5.0e8) -> tuple[float, float]:
+    """Compute continuous density-driven E(rho) for the solver bins.
+
+    Audit_4 Fix 1: replaces discontinuous set-based assignment in make_inp.py.
+    Uses C0-continuous piecewise power law matching bone_remodeling.py logic.
+
+    Returns (E_Pa, n_eff).
+    """
+    if enforce_c0:
+        E_cancellous = E_cortical * (rho_t ** (n_cortical - n_cancellous))
+    else:
+        E_cancellous = E_cancellous_explicit
+    if rho >= rho_t:
+        return max(1.0e3, E_cortical * (rho ** n_cortical)), n_cortical
+    else:
+        return max(1.0e3, E_cancellous * (rho ** n_cancellous)), n_cancellous
+
 # Physical mass densities for gravity loading (kg/m³)
 RHO_CORTICAL = 1900.0
 RHO_CANCELLOUS = 800.0
@@ -117,6 +139,8 @@ n_power = 2      # power-law exponent E(rho) = E_bone * rho^n
 n_power_cortical = 3.0   # cortical bone: Carter-Hayes n~3
 n_power_cancellous = 2.0 # cancellous bone: n~2
 n_bins = 10      # number of density bins for per-element material grouping
+rho_transition = 1.2      # density threshold for trabecular→cortical transition (Audit_4 Fix 1)
+enforce_c0_modulus = True  # enforce C0 continuity at rho_transition (Audit_4 Fix 1)
 E_cortical_remodel = E_cortical    # base modulus for density-binned cortical
 E_cancellous_remodel = E_cancellous  # base modulus for density-binned cancellous
 if REMODEL_PATH.exists():
@@ -127,6 +151,9 @@ if REMODEL_PATH.exists():
     n_bins = int(rm.get("n_bins", n_bins))
     E_cortical_remodel = float(rm.get("E_cortical_pa", E_cortical))
     E_cancellous_remodel = float(rm.get("E_cancellous_pa", E_cancellous))
+    # Audit_4 Fix 1: continuous modulus law config
+    rho_transition = float(rm.get("rho_transition", 1.2))
+    enforce_c0_modulus = bool(rm.get("continuous_modulus_enforce_c0", True))
 
 # Per-element density override written by bone_remodeling.py each remodeling cycle.
 # Keys are string element IDs; values are relative density (rho, dimensionless).
@@ -144,6 +171,7 @@ if SUTURE_MOD_PATH.exists():
 nodes = {int(k): v for k, v in mesh["nodes"].items()}
 elems = {int(k): v for k, v in mesh["elements"].items()}
 sets = mesh["sets"]
+elem_type = mesh.get("elem_type", "C3D8")  # C3D8 (hex) or C3D4 (tet)
 
 fixed = sets["NSET_FIXED"]
 palate = sets["NSET_PALATE"]
@@ -183,14 +211,26 @@ def _quad_cross(p):
     ]
 
 
-def _oral_face(conn, palate_set):
-    """Return the oral-surface face of a C3D8 element, or None.
+def _tri_cross(p):
+    """Return cross product of triangle edges (p[1]-p[0]) x (p[2]-p[0]).
 
-    For v2 (palate at k=0), the oral face is conn[:4] (k-low).
-    For v1 (palate at k=nz), the oral face is conn[4:8] (k-high).
-    Returns the face whose 4 nodes are all in palate_set, or None if
-    neither face qualifies (element is not on the oral surface).
+    The magnitude equals twice the triangle area.
     """
+    d1 = [p[1][c] - p[0][c] for c in range(3)]
+    d2 = [p[2][c] - p[0][c] for c in range(3)]
+    return [
+        d1[1] * d2[2] - d1[2] * d2[1],
+        d1[2] * d2[0] - d1[0] * d2[2],
+        d1[0] * d2[1] - d1[1] * d2[0],
+    ]
+
+
+# Tet face local indices (4 triangular faces of a C3D4)
+_TET_FACE_LOCAL = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+
+
+def _oral_face_hex(conn, palate_set):
+    """Return the oral-surface face of a C3D8 hex element, or None."""
     lo = conn[:4]
     if all(n in palate_set for n in lo):
         return lo
@@ -198,6 +238,38 @@ def _oral_face(conn, palate_set):
     if all(n in palate_set for n in hi):
         return hi
     return None
+
+
+def _oral_face_tet(conn, palate_set):
+    """Return an oral-surface face of a C3D4 tet element, or None.
+
+    Checks all 4 triangular faces; returns the first whose 3 nodes
+    are all in palate_set.
+    """
+    for idx in _TET_FACE_LOCAL:
+        face = [conn[i] for i in idx]
+        if all(n in palate_set for n in face):
+            return face
+    return None
+
+
+def _oral_face(conn, palate_set):
+    """Return the oral-surface face of an element, or None.
+
+    Dispatches to hex or tet version based on connectivity length.
+    """
+    if len(conn) == 8:
+        return _oral_face_hex(conn, palate_set)
+    elif len(conn) == 4:
+        return _oral_face_tet(conn, palate_set)
+    return None
+
+
+def _face_cross(p):
+    """Cross product for a face (quad or triangle)."""
+    if len(p) == 4:
+        return _quad_cross(p)
+    return _tri_cross(p)
 
 
 def _oral_surface_area(nodes, elems, eset_all, palate_set):
@@ -213,7 +285,7 @@ def _oral_surface_area(nodes, elems, eset_all, palate_set):
         if face is None:
             continue
         p = [nodes[n] for n in face]
-        cx = _quad_cross(p)
+        cx = _face_cross(p)
         total += 0.5 * math.sqrt(sum(c * c for c in cx))
     return total
 
@@ -248,7 +320,7 @@ def _palate_node_normals(nodes, elems, eset_all, palate_set):
         if face is None:
             continue
         p = [nodes[n] for n in face]
-        cx = _quad_cross(p)
+        cx = _face_cross(p)
 
         # Ensure normal points into bone (positive z direction on average).
         # The palatal vault means z isn't purely vertical, but across the
@@ -348,8 +420,9 @@ def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
     """Write *ELASTIC (isotropic or orthotropic) and *DENSITY cards.
 
     If ortho dict is provided (and not None), writes TYPE=ORTHO card.
-    CalculiX ORTHO format (single line, 9 values):
-      E1, E2, nu12, E3, nu13, nu23, G12, G13, G23
+    CalculiX ORTHO format (two lines, max 8 values per line):
+      Line 1: E1, E2, nu12, E3, nu13, nu23, G12, G13
+      Line 2: G23
     """
     if ortho:
         E1  = float(ortho["E1_pa"])
@@ -362,7 +435,8 @@ def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
         nu13 = float(ortho["nu13"])
         nu23 = float(ortho["nu23"])
         fh.write("*ELASTIC, TYPE=ORTHO\n")
-        fh.write(f"{E1:.6e}, {E2:.6e}, {nu12:.6f}, {E3:.6e}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e}, {G23:.6e}\n")
+        fh.write(f"{E1:.6e}, {E2:.6e}, {nu12:.6f}, {E3:.6e}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e},\n")
+        fh.write(f"{G23:.6e}\n")
     else:
         fh.write("*ELASTIC\n")
         fh.write(f"{E:.6e}, {nu:.6f}\n")
@@ -486,7 +560,10 @@ def write_material_blocks(fh, case_name: str = "", case_spec=None):
         # When orthotropic mode is active, scale all moduli by rho^n (density-invariant Poisson).
         for idx in sorted(cort_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
-            E_bin = E_cortical_remodel * (rho_center ** n_power_cortical)
+            # Audit_4 Fix 1: continuous E(rho) — no set-based discontinuity
+            E_bin, _ = _continuous_E_from_rho(
+                rho_center, E_cortical_remodel, n_power_cortical, n_power_cancellous,
+                rho_transition, enforce_c0_modulus, E_cancellous_remodel)
             fh.write(f"*MATERIAL, NAME=CORT_BIN_{idx:02d}\n")
             if USE_ORTHO_CORTICAL and _ortho_cfg:
                 _ortho_scaled = _scale_ortho(_ortho_cfg, rho_center, n_power_cortical)
@@ -498,7 +575,10 @@ def write_material_blocks(fh, case_name: str = "", case_spec=None):
         # Write materials: cancellous bins (n=2)
         for idx in sorted(canc_bins):
             rho_center = rho_lo + (idx + 0.5) * bin_width
-            E_bin = E_cancellous_remodel * (rho_center ** n_power_cancellous)
+            # Audit_4 Fix 1: continuous E(rho)
+            E_bin, _ = _continuous_E_from_rho(
+                rho_center, E_cortical_remodel, n_power_cortical, n_power_cancellous,
+                rho_transition, enforce_c0_modulus, E_cancellous_remodel)
             fh.write(f"*MATERIAL, NAME=CANC_BIN_{idx:02d}\n")
             _write_elastic_density(fh, E_bin, nu_cancellous, RHO_CANCELLOUS)
 
@@ -643,7 +723,7 @@ for case, spec in loads.items():
         for nid, (x, y, z) in nodes.items():
             f.write(f"{nid}, {x:.8f}, {y:.8f}, {z:.8f}\n")
 
-        f.write("*ELEMENT, TYPE=C3D8, ELSET=EALL\n")
+        f.write(f"*ELEMENT, TYPE={elem_type}, ELSET=EALL\n")
         for eid, conn in elems.items():
             f.write(f"{eid}, {', '.join(str(n) for n in conn)}\n")
 
@@ -706,12 +786,14 @@ for case, spec in loads.items():
         f.write("*NODE FILE\n")
         f.write("U\n")
         f.write("*EL FILE\n")
-        f.write("S, ENER\n")
+        f.write("S, E, ENER\n")
 
         f.write("*NODE PRINT, NSET=NALL\n")
         f.write("U\n")
         f.write("*EL PRINT, ELSET=EALL\n")
         f.write("S\n")
+        f.write("*EL PRINT, ELSET=EALL\n")
+        f.write("E\n")
         f.write("*EL PRINT, ELSET=EALL\n")
         f.write("ENER\n")
         f.write("*END STEP\n")

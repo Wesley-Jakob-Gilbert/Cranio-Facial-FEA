@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Create remodeling density evolution animations.
 
-Uses Poly3DCollection to render the oral (k=0) surface of the mesh as
-solid filled quads instead of a scatter-plot point cloud.  Each quad is
-coloured by its element's density delta from baseline.
+Uses Poly3DCollection to render the oral surface of the mesh as
+solid filled polygons (quads for C3D8 hex, triangles for C3D4 tet).
+Each face is coloured by its element's density delta from baseline.
 
 Outputs:
 - results/mewing/density_evolution.gif
@@ -31,31 +31,83 @@ SCENARIOS = ("mewing", "mouth_breathing")
 # Mesh loading — oral surface faces
 # ---------------------------------------------------------------------------
 
-def load_oral_surface():
-    """Return oral-surface face data for Poly3DCollection rendering.
+_TET_FACE_LOCAL = np.array([[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]])
+
+
+def _extract_boundary_tet(nodes_dict, elems_dict):
+    """Vectorised boundary-face extraction for C3D4 tet meshes.
 
     Returns
     -------
-    face_verts : ndarray, shape (N_faces, 4, 3)
-        Quad vertex coordinates for each oral-surface face.
-    face_eids : list[int]
-        Element id for each face (same order as face_verts).
+    face_verts : (B, 3, 3) vertex coordinates per boundary face
+    face_eids  : list[int] — 1-based element id per face
+    normals    : (B, 3) unit outward normals
+    """
+    eid_list = sorted(elems_dict.keys())
+    eid_arr = np.array(eid_list)
+    tets = np.array([elems_dict[eid] for eid in eid_list])  # (M, 4) 1-based
+
+    max_nid = max(nodes_dict.keys())
+    pts = np.zeros((max_nid + 1, 3))
+    for nid, coord in nodes_dict.items():
+        pts[nid] = coord
+
+    all_faces = tets[:, _TET_FACE_LOCAL].reshape(-1, 3)
+    tet_idx = np.repeat(np.arange(len(eid_list)), 4)
+
+    sf = np.sort(all_faces, axis=1)
+    N = int(sf.max()) + 1
+    keys = (sf[:, 0].astype(np.int64) * N * N
+            + sf[:, 1].astype(np.int64) * N
+            + sf[:, 2].astype(np.int64))
+    _, inv, cnt = np.unique(keys, return_inverse=True, return_counts=True)
+    bmask = cnt[inv] == 1
+
+    bf = all_faces[bmask]
+    bf_eids = eid_arr[tet_idx[bmask]]
+
+    p0, p1, p2 = pts[bf[:, 0]], pts[bf[:, 1]], pts[bf[:, 2]]
+    verts = np.stack([p0, p1, p2], axis=1)
+    normals = np.cross(p1 - p0, p2 - p0)
+    normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-30)
+    return verts, bf_eids.tolist(), normals
+
+
+def load_oral_surface():
+    """Return oral-surface face data for Poly3DCollection rendering.
+
+    For C3D4 tet meshes: extracts all downward-facing boundary faces
+    (full inferior surface including palate, teeth, and alveolar bone).
+    For C3D8 hex meshes: uses NSET_PALATE membership (original logic).
+
+    Returns
+    -------
+    face_verts : ndarray, shape (N_faces, V, 3) — V=4 for hex, 3 for tet
+    face_eids  : list[int]
     suture_mid_mask : ndarray[bool]
-        True for faces belonging to ESET_SUTURE_MID.
     suture_lat_mask : ndarray[bool]
-        True for faces belonging to ESET_SUTURE_LAT.
     """
     mesh = json.loads((ROOT / "mesh" / "mesh_data.json").read_text())
     nodes = {int(k): v for k, v in mesh["nodes"].items()}
     elems = {int(k): v for k, v in mesh["elements"].items()}
     sets = mesh.get("sets", {})
+    et = mesh.get("elem_type", "C3D8")
 
-    palate_set = set(sets.get("NSET_PALATE", []))
     s_mid = set(sets.get("ESET_SUTURE_MID", []))
     s_lat = set(sets.get("ESET_SUTURE_LAT", []))
 
-    # Oral surface = element faces where all 4 bottom-face nodes are in NSET_PALATE.
-    # For C3D8 hex, the first 4 nodes in the connectivity list form one face.
+    if et == "C3D4":
+        print("[anim] Extracting boundary faces for tet mesh ...")
+        face_verts, face_eids, normals = _extract_boundary_tet(nodes, elems)
+        down = normals[:, 2] < -0.3
+        face_verts = face_verts[down]
+        face_eids = [face_eids[i] for i, m in enumerate(down) if m]
+        mid_mask = np.array([eid in s_mid for eid in face_eids])
+        lat_mask = np.array([eid in s_lat for eid in face_eids])
+        return face_verts, face_eids, mid_mask, lat_mask
+
+    # Hex mesh: original NSET_PALATE-based logic
+    palate_set = set(sets.get("NSET_PALATE", []))
     face_verts_list = []
     face_eids = []
     mid_mask = []
@@ -63,15 +115,21 @@ def load_oral_surface():
 
     for eid in sorted(elems.keys()):
         conn = elems[eid]
-        bottom_face = conn[:4]  # nodes 0-3 of C3D8
+        bottom_face = conn[:4]
         if all(n in palate_set for n in bottom_face):
-            verts = [nodes[n] for n in bottom_face]
-            face_verts_list.append(verts)
+            face_verts_list.append([nodes[n] for n in bottom_face])
+            face_eids.append(eid)
+            mid_mask.append(eid in s_mid)
+            lat_mask.append(eid in s_lat)
+            continue
+        top_face = conn[4:8]
+        if all(n in palate_set for n in top_face):
+            face_verts_list.append([nodes[n] for n in top_face])
             face_eids.append(eid)
             mid_mask.append(eid in s_mid)
             lat_mask.append(eid in s_lat)
 
-    face_verts = np.array(face_verts_list, dtype=float)  # (N, 4, 3)
+    face_verts = np.array(face_verts_list, dtype=float)
     return face_verts, face_eids, np.array(mid_mask), np.array(lat_mask)
 
 
@@ -156,17 +214,27 @@ def _add_surface(ax, face_verts, mid_mask, lat_mask, sm, initial_vals):
     sm : ScalarMappable  – maps density delta values to RGBA colours.
     initial_vals : 1-D array of delta values for the first frame.
     """
-    edge_colors = _build_edge_colors(mid_mask, lat_mask)
-    linewidths = _build_linewidths(mid_mask, lat_mask)
-
     facecolors = sm.to_rgba(initial_vals)
+    n_faces = len(face_verts)
 
-    poly = Poly3DCollection(
-        face_verts,
-        facecolors=facecolors,
-        edgecolors=edge_colors,
-        linewidths=linewidths,
-    )
+    if n_faces > 5000:
+        # Dense mesh: very thin semi-transparent edges give shape without
+        # obscuring face colours on small triangles
+        poly = Poly3DCollection(
+            face_verts,
+            facecolors=facecolors,
+            edgecolors=(0.65, 0.65, 0.65, 0.15),
+            linewidths=0.08,
+        )
+    else:
+        edge_colors = _build_edge_colors(mid_mask, lat_mask)
+        linewidths = _build_linewidths(mid_mask, lat_mask)
+        poly = Poly3DCollection(
+            face_verts,
+            facecolors=facecolors,
+            edgecolors=edge_colors,
+            linewidths=linewidths,
+        )
     ax.add_collection3d(poly)
     return poly
 
@@ -187,6 +255,7 @@ def _setup_axes(ax, face_verts):
     ax.set_ylim(y_min - pad_y, y_max + pad_y)
     ax.set_zlim(z_min - pad_z, z_max + pad_z)
 
+    ax.set_facecolor((0.93, 0.93, 0.93))
     ax.set_xlabel("x (m)", fontsize=7)
     ax.set_ylabel("y (m)", fontsize=7)
     ax.set_zlabel("z (m)", fontsize=7)

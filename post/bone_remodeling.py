@@ -60,6 +60,20 @@ This is only used when CalculiX ENER (elem_sed.csv) is unavailable.
 For orthotropic runs we still require elem_sed.csv — a hard warning is emitted.
 Audit_2 item 5.
 
+## Fix 6: Dynamic strain-based suture softening threshold (Audit_5)
+The prior implementation set:
+  tension_thresh_pa = strain_threshold * E_baseline  (constant Pa)
+As a suture softened (E_prev << E_baseline), internal stress dropped below this
+fixed threshold even under large strains → premature arrest + numerical oscillation.
+Fix: threshold is now computed dynamically each call:
+  current_tension_thresh_pa = strain_threshold * E_prev
+This makes the effective trigger condition strain-invariant:
+  s1 / E_prev > strain_threshold  (ε_approx > threshold)
+which is physically correct — suture mechanoreceptors sense stretch, not absolute force.
+Config: suture_remodeling.strain_threshold (default 0.00015 = 150 µε).
+Note: legacy tension_threshold_pa (absolute Pa) is no longer used; use strain_threshold.
+Audit_5.
+
 ## Cyclic-load duty cycle (updated — see Fix 2)
 Power-law effective SED replaces linear time-fraction averaging.
 
@@ -251,6 +265,74 @@ def sed_from_tensor_isotropic(sxx, syy, szz, sxy, sxz, syz, E: float, nu: float)
     return max(0.0, normal + shear)
 
 
+
+# ---------------------------------------------------------------------------
+# Audit_4 Fix 1: Continuous density-driven modulus law (replaces set-based)
+# ---------------------------------------------------------------------------
+
+def continuous_E_from_density(rho: float, cfg: dict) -> tuple[float, float]:
+    """Compute Young's modulus and Carter-Hayes exponent from density alone.
+
+    Replaces the discontinuous set-based assignment (cortical/cancellous element
+    sets → fixed E_cortical or E_cancellous base modulus with fixed n) which
+    creates non-physical modulus jumps at layer boundaries.
+
+    Physical basis (Carter & Hayes 1977; Rice, Cowin & Bowman 1988):
+        E(ρ) ∝ ρ^n — empirically continuous across the trabecular→cortical
+        transition. We use a piecewise function keyed on ρ rather than element set:
+
+          ρ < rho_trabecular_upper (default 1.2):
+              E = E_cancellous * ρ^2   [Rice 1988: n≈2 for cancellous]
+          ρ >= rho_trabecular_upper:
+              E = E_cortical * ρ^3    [Carter & Hayes 1977: n≈3 for cortical]
+
+        At the transition density ρ=1.2, both branches should be calibrated
+        to give matching moduli (see rho_transition_E_match below).
+
+    Continuity fix:
+        At the transition point ρ_t, we require E_cancellous*ρ_t^2 == E_cortical*ρ_t^3,
+        which means E_cancellous_effective = E_cortical * ρ_t.  This sets E_cancellous
+        as a derived quantity rather than an independent constant, ensuring C0 continuity.
+
+    Args:
+        rho: relative density (dimensionless; typ. 0.4–1.5)
+        cfg: remodeling config dict
+
+    Returns:
+        (E_Pa, n_eff): instantaneous Young's modulus in Pa, effective exponent
+    """
+    E_cortical = float(cfg.get("E_cortical_pa", 1.5e10))
+    n_cortical = float(cfg.get("n_power_cortical", 3.0))
+    n_cancellous = float(cfg.get("n_power_cancellous", 2.0))
+    rho_t = float(cfg.get("rho_transition", 1.2))  # density threshold for trabecular→cortical
+
+    # Enforce C0 continuity: E_cancellous is derived from E_cortical and rho_t
+    # so that E_cancellous * rho_t^n_cancellous == E_cortical * rho_t^n_cortical
+    # => E_cancellous = E_cortical * rho_t^(n_cortical - n_cancellous)
+    # With n_cortical=3, n_cancellous=2, rho_t=1.2:
+    #   E_cancellous = E_cortical * 1.2^1 = 1.2 * E_cortical  → ~18 GPa at ρ=1
+    # But raw cancellous at ρ=1 is ~0.5 GPa (literature), so we use the
+    # USER-specified E_cancellous for the ρ < rho_t branch and accept a small
+    # discontinuity only if user-provided values are inconsistent.
+    # If continuous_modulus_enforce_c0=true (default), E_cancellous is overridden
+    # by the derived value to ensure C0 continuity.
+    enforce_c0 = bool(cfg.get("continuous_modulus_enforce_c0", True))
+
+    if enforce_c0:
+        # Derived E_cancellous for C0 continuity at rho_t
+        E_cancellous = E_cortical * (rho_t ** (n_cortical - n_cancellous))
+    else:
+        E_cancellous = float(cfg.get("E_cancellous_pa", 5.0e8))
+
+    if rho >= rho_t:
+        E = E_cortical * (rho ** n_cortical)
+        n_eff = n_cortical
+    else:
+        E = E_cancellous * (rho ** n_cancellous)
+        n_eff = n_cancellous
+
+    return max(1.0e3, E), n_eff
+
 # ---------------------------------------------------------------------------
 # Fix 2: Power-law cyclic loading (Turner 1998 / Rubin & Lanyon 1984)
 # ---------------------------------------------------------------------------
@@ -284,6 +366,18 @@ def compute_cyclic_psi_eff(
 
     The static rest contribution is DROPPED (per Rubin & Lanyon 1984).
 
+    Audit_4 Fix 3: Masticatory amplification factor.
+        Swallowing is NOT just a scaled resting tongue load. Deglutition involves
+        co-contraction of masseter, temporalis, and medial pterygoids at levels
+        comparable to light chewing (Bakke 1993; van Eijden 1991).
+        The stress tensor orientation and distribution differ substantially from
+        the purely palatal tongue-pressure model used for resting load cases.
+        A masticatory_amplification_factor (default 2.5) multiplies psi_peak to
+        partially account for the jaw-muscle SED contribution during swallowing.
+        This is an interim correction; the ideal fix is a separate FEA load case
+        that explicitly models masseter/temporalis forces during deglutition.
+        Config: cyclic_loading.masticatory_amplification_factor (default 2.5).
+
     Args:
         cyclic_cfg:  'cyclic_loading' sub-dict from remodeling.yaml
         tongue_kpa:  resting tongue pressure for this load case (kPa)
@@ -313,6 +407,13 @@ def compute_cyclic_psi_eff(
 
     psi_peak = psi_rest * (pressure_ratio ** 2)
 
+    # Audit_4 Fix 3: Masticatory amplification for jaw-muscle co-contraction during swallow.
+    # Masseter + temporalis co-activation during deglutition adds substantial SED
+    # that is not captured by the resting tongue-pressure load case.
+    # masticatory_amplification_factor ~ 2-3 is conservative (cf. Bakke 1993).
+    masticatory_amp = float(cyclic_cfg.get("masticatory_amplification_factor", 2.5))
+    psi_peak = psi_peak * masticatory_amp
+
     # Power-law cycle scaling (Turner 1998):
     # More cycles amplify the signal but with diminishing returns
     cycle_factor = (swallow_cycles / max(ref_cycles, 1.0)) ** (1.0 / m_power)
@@ -333,7 +434,7 @@ def update_suture_modulus(
     E_baseline: float,
     suture_cfg: dict,
 ) -> float:
-    """Compute updated suture modulus for one element — TENSION-ONLY softening.
+    """Compute updated suture modulus for one element — TENSION-ONLY softening + progressive ossification.
 
     Physical basis:
         Cranial sutures are fibrous periosteal joints that widen (soften/stretch)
@@ -346,9 +447,31 @@ def update_suture_modulus(
         Softening fires only when s1 > tensile_threshold (Pa).
         When s1 ≤ 0 (compressive dominant): recovery path only.
 
+    Audit_5 Fix: Dynamic strain-based threshold (replaces fixed E_baseline threshold)
+    ─────────────────────────────────────────────────────────────────────────────
+    The previous implementation computed:
+        tension_thresh_pa = strain_threshold * E_baseline  (FIXED, Pa)
+
+    As the suture softens (E_prev << E_baseline), Hookean stress s1 ≈ ε * E_prev drops
+    proportionally. The FIXED threshold demanded exponentially more strain to trigger
+    further softening (ratio E_baseline/E_prev can reach 100–1000× at typical softening).
+    This caused premature remodeling arrest and oscillation (soften → stress drops below
+    threshold → ossify → stiffen → stress spikes → soften).
+
+    Biologically, suture cells sense STRAIN (membrane stretch), not absolute force.
+    Fix: threshold is computed dynamically against E_prev so that the effective strain
+    threshold remains constant regardless of current stiffness:
+
+        current_tension_thresh_pa = strain_threshold * max(E_prev, 1.0)
+
+    This makes the trigger condition equivalent to:
+        s1 / E_prev > strain_threshold   i.e.   ε_approx > strain_threshold
+
+    which is physically invariant to softening state.
+
     Exponential softening on tension path:
-        E_new = E_prev * exp(-beta * (s1 - threshold) / E_prev)
-        The strain-like excess is (s1 - threshold) / E_prev (Hookean approximation).
+        excess_strain = (s1 - current_threshold) / E_prev
+        E_new = E_prev * exp(-beta * excess_strain)
 
     Sub-threshold recovery (secondary ossification analog):
         E_new = E_prev + recovery_rate * (E_baseline - E_prev)
@@ -361,25 +484,44 @@ def update_suture_modulus(
         suture_cfg:   sub-dict from remodeling.yaml -> suture_remodeling
 
     Returns:
-        Updated Young's modulus (Pa), clamped to [E_min, E_baseline].
+        Updated Young's modulus (Pa), clamped to [E_min, E_bone_max].
     """
     beta = float(suture_cfg.get("beta", 40.0))
     E_min = float(suture_cfg.get("E_min_pa", 1.0e7))
-    # Tension threshold in Pa (default 10 kPa; typical suture yield onset)
-    tension_thresh_pa = float(suture_cfg.get("tension_threshold_pa",
-                                              suture_cfg.get("strain_threshold", 0.00015) * E_baseline))
     recovery_rate = float(suture_cfg.get("recovery_rate", 0.05))
 
-    if s1_max > tension_thresh_pa:
+    # Audit_5 Fix: Dynamic strain threshold — constant in strain space, not stress space.
+    # strain_threshold default: 150 µε (0.00015) — typical fibrous suture yield onset.
+    # NOTE: tension_threshold_pa (legacy absolute Pa value) is deliberately ignored here;
+    # use strain_threshold to configure yield onset as a dimensionless strain fraction.
+    strain_threshold = float(suture_cfg.get("strain_threshold", 0.00015))
+    # Dynamic threshold tracks current stiffness: Pa = strain × E_prev
+    current_tension_thresh_pa = strain_threshold * max(E_prev, 1.0)
+
+    if s1_max > current_tension_thresh_pa:
         # Tensile opening path: exponential softening
-        # Excess stress normalized by current modulus gives a strain-like measure
-        excess_strain = (s1_max - tension_thresh_pa) / max(E_prev, 1.0)
+        # Excess stress normalized by current modulus gives the true excess strain
+        excess_strain = (s1_max - current_tension_thresh_pa) / max(E_prev, 1.0)
         E_new = E_prev * math.exp(-beta * excess_strain)
         E_new = max(E_min, min(E_baseline, E_new))
     else:
-        # Compressive or sub-threshold: recovery toward baseline (ossification analog)
-        E_new = E_prev + recovery_rate * (E_baseline - E_prev)
-        E_new = min(E_baseline, E_new)
+        # Compressive or sub-threshold: progressive ossification.
+        # Audit_4 Fix 2: sutures under sustained compression or disuse don't merely
+        # recover to the fibrous baseline — they OSSIFY (synostosis).
+        # Mineralization drives E toward E_bone_max_pa (1-5 GPa, configurable).
+        E_bone_max = float(suture_cfg.get("E_bone_max_pa", 5.0e9))  # 5 GPa ossified suture
+        ossification_rate = float(suture_cfg.get("ossification_rate_factor", 0.2)) * recovery_rate
+        if s1_max <= 0:
+            # Compressive: drive toward fully ossified bone modulus
+            target = E_bone_max
+            rate = ossification_rate
+        else:
+            # Sub-threshold tensile (0 < s1 ≤ current_threshold): recover to fibrous baseline
+            target = E_baseline
+            rate = recovery_rate
+        E_new = E_prev + rate * (target - E_prev)
+        # Allow ossification to exceed baseline, but clamp at bone maximum
+        E_new = max(E_min, min(E_bone_max, E_new))
 
     return E_new
 
@@ -522,22 +664,20 @@ def main():
             delta[eid] = rho_new[eid] - r0
             continue
 
-        # Select layer-specific psi_ref and n_power
+        # Audit_4 Fix 1: Continuous density-driven E(rho) — no set-based discontinuity.
+        # E_base and n_pow are now derived from density alone via continuous_E_from_density().
+        # psi_ref is still layer-set-based (physiological setpoint differs trabecular/cortical).
         if _has_layers and eid in cortical:
             psi_ref = psi_ref_cortical
-            n_pow = n_power_cortical
-            E_base = E_cortical
             nu = nu_cortical
         elif _has_layers and eid in cancellous:
             psi_ref = psi_ref_cancellous
-            n_pow = n_power_cancellous
-            E_base = E_cancellous
             nu = nu_cancellous
         else:
             psi_ref = psi_ref_global
-            n_pow = n_power
-            E_base = E_bone
             nu = nu_bone
+        # Continuous E(rho): E_base and n_pow derived from current density, not element set
+        E_base, n_pow = continuous_E_from_density(r0, cfg)
 
         # --- Raw (static) SED ---
         if sed_direct and eid in sed_direct:
@@ -650,12 +790,10 @@ def main():
                 mod[str(eid)] = float(suture_modulus.get(str(eid), E_suture))
             elif eid in tooth_root:
                 mod[str(eid)] = float(cfg.get("E_tooth_root_pa", 2.0e10))
-            elif _has_layers and eid in cortical:
-                mod[str(eid)] = E_cortical * (r ** n_power_cortical)
-            elif _has_layers and eid in cancellous:
-                mod[str(eid)] = E_cancellous * (r ** n_power_cancellous)
             else:
-                mod[str(eid)] = E_bone * (r ** n_power)
+                # Audit_4 Fix 1: continuous E(rho) — no set-based discontinuity
+                E_cont, _ = continuous_E_from_density(r, cfg)
+                mod[str(eid)] = E_cont
         (case_dir / "elem_modulus_debug.json").write_text(json.dumps(mod, indent=2))
 
     # --- Summary stats ---

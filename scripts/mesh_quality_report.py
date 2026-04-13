@@ -36,6 +36,23 @@ nodes_raw = mesh["nodes"]
 elems_raw = mesh["elements"]
 profile = mesh.get("profile", "unknown")
 
+# C3D4 tet meshes: skip hex-specific quality metrics (CT meshes were
+# quality-checked by their source dataset).
+if mesh.get("elem_type", "C3D8") == "C3D4":
+    print(f"[mesh_quality] Skipping hex quality report for C3D4 tet mesh "
+          f"({len(elems_raw)} elements, profile={profile})")
+    CSV_OUT.parent.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "profile": profile,
+        "elem_type": "C3D4",
+        "n_elements": len(elems_raw),
+        "n_nodes": len(nodes_raw),
+        "note": "Hex quality metrics not applicable to C3D4 tet mesh",
+    }
+    JSON_OUT.write_text(json.dumps(summary, indent=2))
+    print(f"[mesh_quality] Wrote {JSON_OUT}")
+    raise SystemExit(0)
+
 # Build numpy arrays for fast access
 # node_coords[node_id] = [x, y, z]  (using max node id + 1 for direct indexing)
 max_nid = max(int(k) for k in nodes_raw)

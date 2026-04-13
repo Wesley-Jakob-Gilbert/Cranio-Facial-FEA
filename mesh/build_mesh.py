@@ -405,6 +405,18 @@ def generate_v2(cfg: dict):
 
 
 # ── dispatch ──────────────────────────────────────────────────────────────────
+if profile == "ct_maxilla":
+    from build_mesh_ct import build_ct_mesh
+    mesh = build_ct_mesh(cfg.get("ct_mesh", {}), repo_root=ROOT)
+    OUT.write_text(json.dumps(mesh))
+    print(f"Wrote {OUT}")
+    print(f"Profile: {profile}")
+    print(f"Nodes: {len(mesh['nodes'])}, Elements: {len(mesh['elements'])}")
+    for k in ["ESET_BONE", "ESET_CORTICAL", "ESET_CANCELLOUS",
+              "ESET_SUTURE_MID", "ESET_SUTURE_LAT"]:
+        print(f"  {k}: {len(mesh['sets'].get(k, []))}")
+    raise SystemExit(0)
+
 if profile == "template_maxilla_v2":
     nodes, elements, sets, nx, ny, nz, dims = generate_v2(cfg)
 else:
