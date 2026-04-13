@@ -133,15 +133,28 @@ def build_ct_mesh(ct_cfg: dict, repo_root: Path | None = None) -> dict:
     normals /= norms
     centroids_bf = (p0 + p1 + p2) / 3.0  # (B, 3)
 
-    # --- NSET_PALATE: inferior-facing boundary in lower portion -----------
+    # --- NSET_PALATE: palatal vault (downward-facing boundary, mid-Z band) -
+    # The palatal vault sits ABOVE the tooth tips (low Z) but BELOW the nasal
+    # floor (high Z).  We select downward-facing boundary faces whose centroid
+    # Z falls within a percentile band of *downward-facing* face centroids.
+    # This excludes tooth occlusal surfaces (low Z) and nasal-floor edges (high Z).
     nz_thresh = ct_cfg.get("palate_normal_z_threshold", -0.3)
-    z_pct = ct_cfg.get("palate_z_percentile", 40)
-    z_cutoff = np.percentile(centroids_bf[:, 2], z_pct)
+    down_mask = normals[:, 2] < nz_thresh
+    down_z = centroids_bf[down_mask, 2]
 
-    palate_mask = (normals[:, 2] < nz_thresh) & (centroids_bf[:, 2] < z_cutoff)
+    z_lo_pct = ct_cfg.get("palate_z_lo_percentile", 35)
+    z_hi_pct = ct_cfg.get("palate_z_hi_percentile", 85)
+    z_lo = np.percentile(down_z, z_lo_pct)
+    z_hi = np.percentile(down_z, z_hi_pct)
+
+    palate_mask = down_mask & (centroids_bf[:, 2] >= z_lo) & (centroids_bf[:, 2] <= z_hi)
     palate_nodes_0 = np.unique(bfaces[palate_mask])  # 0-based
     palate_nodes_1 = (palate_nodes_0 + 1).tolist()
     print(f"[ct] NSET_PALATE: {len(palate_nodes_1)} nodes ({palate_mask.sum()} faces)")
+    print(f"[ct]   Z band: [{z_lo:.6f}, {z_hi:.6f}] m  "
+          f"(p{z_lo_pct}-p{z_hi_pct} of downward-facing faces)")
+    print(f"[ct]   Node Z range: [{pts[palate_nodes_0, 2].min():.6f}, "
+          f"{pts[palate_nodes_0, 2].max():.6f}] m")
 
     # --- NSET_FIXED: nodes at extreme boundaries --------------------------
     fix_tol = ct_cfg.get("fixed_posterior_tolerance_m", 0.002)
