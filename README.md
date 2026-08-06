@@ -30,7 +30,7 @@ The divergence is consistent with Wolff's law and the mechanostat hypothesis: lo
 
 ### Geometry
 
-CT-derived maxillary mesh from the [Open-Full-Jaw](https://doi.org/10.1038/s41597-024-03838-0) dataset (Patient 3): **184,617 nodes, 853,068 C3D4 tetrahedral elements**. The volumetric mesh is spatially labeled into material zones via boundary-face and centroid heuristics:
+CT-derived maxillary mesh from the [Open-Full-Jaw](https://github.com/diku-dk/Open-Full-Jaw) dataset (Patient 3): **184,617 nodes, 853,068 C3D4 tetrahedral elements**. The volumetric mesh is spatially labeled into material zones via boundary-face and centroid heuristics:
 
 - **Cortical bone** (139,362 elements) — surface layer (elements with boundary faces), E = 15 GPa
 - **Cancellous bone** (694,073 elements) — interior bone, E = 0.5 GPa
