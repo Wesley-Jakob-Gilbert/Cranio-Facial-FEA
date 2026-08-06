@@ -177,6 +177,9 @@ For a thorough discussion, see [docs/SCIENTIFIC_CAVEATS.md](docs/SCIENTIFIC_CAVE
 3. Frost, H.M. (2003). Bone's mechanostat: A 2003 update. *Anat. Rec.*, 275A(2), 1081-1101.
 4. Mew, J.R.C. (2004). The postural basis of malocclusion: A philosophical overview. *Am. J. Orthod. Dentofac. Orthop.*, 126(6), 729-738.
 5. Proffit, W.R. (1978). Equilibrium theory revisited. *Angle Orthod.*, 48(3), 175-186.
+6. Gholamalizadeh, T., et al. (2022). Open-Full-Jaw: An open-access dataset and pipeline for finite element models of human jaw. *Computer Methods and Programs in Biomedicine*, 224, 107009.
+
+
 
 ---
 
