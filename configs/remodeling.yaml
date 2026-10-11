@@ -42,5 +42,3 @@ remodeling:
     tau_creep: 24.0
     E_bone_max_pa: 5000000000.0
     ossification_rate_factor: 0.2
-  rho_transition: 1.2
-  continuous_modulus_enforce_c0: true

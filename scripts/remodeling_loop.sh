@@ -44,6 +44,9 @@ for scenario in "${SCENARIOS[@]}"; do
   # reset per-scenario evolving state
   rm -f "results/$scenario/elem_density.json"
   rm -f "results/$scenario/suture_modulus.json"
+  # Also clear the solver-side sidecars: otherwise cycle 1 of this scenario
+  # silently inherits the final state of the previous scenario (or a prior run).
+  rm -f solver/elem_density.json solver/suture_modulus.json
 
   for cycle in $(seq 1 "$CYCLES"); do
     echo "  cycle $cycle/$CYCLES"
@@ -52,7 +55,7 @@ for scenario in "${SCENARIOS[@]}"; do
     cp "results/$scenario/elem_density.json" solver/elem_density.json 2>/dev/null || true
     cp "results/$scenario/suture_modulus.json" solver/suture_modulus.json 2>/dev/null || true
 
-    python3 solver/make_inp.py
+    python3 solver/make_inp.py "$scenario"
     ./solver/run_case.sh "$scenario"
     python3 post/extract_fields.py
     # Pass tongue_kpa for cyclic SED weighting

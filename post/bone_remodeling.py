@@ -267,71 +267,20 @@ def sed_from_tensor_isotropic(sxx, syy, szz, sxy, sxz, syz, E: float, nu: float)
 
 
 # ---------------------------------------------------------------------------
-# Audit_4 Fix 1: Continuous density-driven modulus law (replaces set-based)
+# Per-layer density-modulus law
 # ---------------------------------------------------------------------------
 
-def continuous_E_from_density(rho: float, cfg: dict) -> tuple[float, float]:
-    """Compute Young's modulus and Carter-Hayes exponent from density alone.
+def layer_modulus(rho: float, E_tissue: float, n: float) -> float:
+    """Carter-Hayes power law on relative density: E = E_tissue * rho^n.
 
-    Replaces the discontinuous set-based assignment (cortical/cancellous element
-    sets → fixed E_cortical or E_cancellous base modulus with fixed n) which
-    creates non-physical modulus jumps at layer boundaries.
-
-    Physical basis (Carter & Hayes 1977; Rice, Cowin & Bowman 1988):
-        E(ρ) ∝ ρ^n — empirically continuous across the trabecular→cortical
-        transition. We use a piecewise function keyed on ρ rather than element set:
-
-          ρ < rho_trabecular_upper (default 1.2):
-              E = E_cancellous * ρ^2   [Rice 1988: n≈2 for cancellous]
-          ρ >= rho_trabecular_upper:
-              E = E_cortical * ρ^3    [Carter & Hayes 1977: n≈3 for cortical]
-
-        At the transition density ρ=1.2, both branches should be calibrated
-        to give matching moduli (see rho_transition_E_match below).
-
-    Continuity fix:
-        At the transition point ρ_t, we require E_cancellous*ρ_t^2 == E_cortical*ρ_t^3,
-        which means E_cancellous_effective = E_cortical * ρ_t.  This sets E_cancellous
-        as a derived quantity rather than an independent constant, ensuring C0 continuity.
-
-    Args:
-        rho: relative density (dimensionless; typ. 0.4–1.5)
-        cfg: remodeling config dict
-
-    Returns:
-        (E_Pa, n_eff): instantaneous Young's modulus in Pa, effective exponent
+    rho is RELATIVE density (1.0 = the layer's baseline), so each layer keeps
+    its own reference modulus and exponent (cortical: 15 GPa, n=3;
+    cancellous: 0.5 GPa, n=2). This is the same law make_inp.py uses when it
+    writes density-binned materials, so cycle 1 (no density file) and later
+    cycles see identical stiffness for identical density.
     """
-    E_cortical = float(cfg.get("E_cortical_pa", 1.5e10))
-    n_cortical = float(cfg.get("n_power_cortical", 3.0))
-    n_cancellous = float(cfg.get("n_power_cancellous", 2.0))
-    rho_t = float(cfg.get("rho_transition", 1.2))  # density threshold for trabecular→cortical
+    return max(1.0e3, E_tissue * (rho ** n))
 
-    # Enforce C0 continuity: E_cancellous is derived from E_cortical and rho_t
-    # so that E_cancellous * rho_t^n_cancellous == E_cortical * rho_t^n_cortical
-    # => E_cancellous = E_cortical * rho_t^(n_cortical - n_cancellous)
-    # With n_cortical=3, n_cancellous=2, rho_t=1.2:
-    #   E_cancellous = E_cortical * 1.2^1 = 1.2 * E_cortical  → ~18 GPa at ρ=1
-    # But raw cancellous at ρ=1 is ~0.5 GPa (literature), so we use the
-    # USER-specified E_cancellous for the ρ < rho_t branch and accept a small
-    # discontinuity only if user-provided values are inconsistent.
-    # If continuous_modulus_enforce_c0=true (default), E_cancellous is overridden
-    # by the derived value to ensure C0 continuity.
-    enforce_c0 = bool(cfg.get("continuous_modulus_enforce_c0", True))
-
-    if enforce_c0:
-        # Derived E_cancellous for C0 continuity at rho_t
-        E_cancellous = E_cortical * (rho_t ** (n_cortical - n_cancellous))
-    else:
-        E_cancellous = float(cfg.get("E_cancellous_pa", 5.0e8))
-
-    if rho >= rho_t:
-        E = E_cortical * (rho ** n_cortical)
-        n_eff = n_cortical
-    else:
-        E = E_cancellous * (rho ** n_cancellous)
-        n_eff = n_cancellous
-
-    return max(1.0e3, E), n_eff
 
 # ---------------------------------------------------------------------------
 # Fix 2: Power-law cyclic loading (Turner 1998 / Rubin & Lanyon 1984)
@@ -600,13 +549,17 @@ def main():
     # Config: psi_ref_auto_calibrate_cyclic: true (default on; set false to revert).
     psi_ref_auto_calibrate_cyclic = bool(cfg.get("psi_ref_auto_calibrate_cyclic", True))
     if cyclic_enabled and psi_ref_auto_calibrate_cyclic:
-        _c_peak_kpa = float(cyclic_cfg.get("swallow_peak_kpa", 35.0))
+        # Scale the setpoints by the FULL cyclic transform evaluated at the
+        # reference tongue pressure (pressure ratio^2 x masticatory amplification
+        # x cycle factor). Scaling by the pressure ratio alone left the
+        # amplification uncancelled, so an element exactly at its setpoint saw
+        # stimulus = sqrt(2.5) - 1 = 0.58 (outside the lazy zone) instead of 0.
         _c_ref_kpa = float(cyclic_cfg.get("tongue_kpa_ref", 2.0))
-        _pressure_ratio_sq = (_c_peak_kpa / max(_c_ref_kpa, 1e-9)) ** 2
-        psi_ref_global = psi_ref_global * _pressure_ratio_sq
-        psi_ref_cortical = psi_ref_cortical * _pressure_ratio_sq
-        psi_ref_cancellous = psi_ref_cancellous * _pressure_ratio_sq
-        print(f"  [cyclic psi_ref calibration] pressure_ratio_sq={_pressure_ratio_sq:.1f}x: "
+        _, _ref_scale = compute_cyclic_psi_eff(cyclic_cfg, _c_ref_kpa, 1.0)
+        psi_ref_global = psi_ref_global * _ref_scale
+        psi_ref_cortical = psi_ref_cortical * _ref_scale
+        psi_ref_cancellous = psi_ref_cancellous * _ref_scale
+        print(f"  [cyclic psi_ref calibration] scale={_ref_scale:.1f}x: "
               f"psi_ref_cortical={psi_ref_cortical:.2f} Pa, "
               f"psi_ref_cancellous={psi_ref_cancellous:.2f} Pa")
 
@@ -664,20 +617,20 @@ def main():
             delta[eid] = rho_new[eid] - r0
             continue
 
-        # Audit_4 Fix 1: Continuous density-driven E(rho) — no set-based discontinuity.
-        # E_base and n_pow are now derived from density alone via continuous_E_from_density().
-        # psi_ref is still layer-set-based (physiological setpoint differs trabecular/cortical).
+        # Layer-specific setpoint, tissue modulus and power-law exponent.
         if _has_layers and eid in cortical:
             psi_ref = psi_ref_cortical
             nu = nu_cortical
+            E_tissue, n_pow = E_cortical, n_power_cortical
         elif _has_layers and eid in cancellous:
             psi_ref = psi_ref_cancellous
             nu = nu_cancellous
+            E_tissue, n_pow = E_cancellous, n_power_cancellous
         else:
             psi_ref = psi_ref_global
             nu = nu_bone
-        # Continuous E(rho): E_base and n_pow derived from current density, not element set
-        E_base, n_pow = continuous_E_from_density(r0, cfg)
+            E_tissue, n_pow = E_bone, n_power
+        E_elem = layer_modulus(r0, E_tissue, n_pow)
 
         # --- Raw (static) SED ---
         if sed_direct and eid in sed_direct:
@@ -685,12 +638,10 @@ def main():
         elif stress_tensor and eid in stress_tensor and not _ortho_enabled:
             # Fix 5: proper isotropic SED from full stress tensor
             sxx, syy, szz, sxy, sxz, syz = stress_tensor[eid]
-            E_elem = max(1e3, E_base * (r0 ** n_pow))
             psi_raw = sed_from_tensor_isotropic(sxx, syy, szz, sxy, sxz, syz, E_elem, nu)
         else:
             # Legacy fallback: vm²/2E (deprecated; physically inaccurate)
             vm_e = float(vm.get(eid, 0.0))
-            E_elem = max(1e3, E_base * (r0 ** n_pow))
             psi_raw = (vm_e * vm_e) / (2.0 * E_elem)
 
         # --- Fix 2: Power-law cyclic loading correction ---
@@ -790,10 +741,12 @@ def main():
                 mod[str(eid)] = float(suture_modulus.get(str(eid), E_suture))
             elif eid in tooth_root:
                 mod[str(eid)] = float(cfg.get("E_tooth_root_pa", 2.0e10))
+            elif eid in cortical:
+                mod[str(eid)] = layer_modulus(r, E_cortical, n_power_cortical)
+            elif eid in cancellous:
+                mod[str(eid)] = layer_modulus(r, E_cancellous, n_power_cancellous)
             else:
-                # Audit_4 Fix 1: continuous E(rho) — no set-based discontinuity
-                E_cont, _ = continuous_E_from_density(r, cfg)
-                mod[str(eid)] = E_cont
+                mod[str(eid)] = layer_modulus(r, E_bone, n_power)
         (case_dir / "elem_modulus_debug.json").write_text(json.dumps(mod, indent=2))
 
     # --- Summary stats ---
