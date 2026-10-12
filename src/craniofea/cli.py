@@ -50,7 +50,11 @@ def cmd_study(args) -> int:
 
 
 def cmd_sensitivity(args) -> int:
-    from craniofea.remodel.sensitivity import morris_study, sweep_static_cycles
+    from craniofea.remodel.sensitivity import (
+        critical_static_cycles,
+        morris_study,
+        sweep_static_cycles,
+    )
 
     cfg, mesh, solver, out = _setup(args)
     if args.trajectories:
@@ -61,6 +65,15 @@ def cmd_sensitivity(args) -> int:
     manifest = provenance(cfg, mesh, solver, {"analysis": args.what})
     (out / "sensitivity_manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
     if args.what in ("sweep", "all"):
+        a = cfg.sensitivity.contrast[0]
+        crit = critical_static_cycles(mesh, cfg, solver, scenario=a)
+        np.savez_compressed(out / "critical_static_cycles.npz", n_crit=crit.pop("n_crit"))
+        (out / "critical_static_cycles.json").write_text(json.dumps(crit, indent=2))
+        print(f"static_equivalent_cycles at which '{a}' first leaves the lazy zone (rho = 1):")
+        for r, v in crit.items():
+            if isinstance(v, dict):
+                print(f"  {r:<28s} min {v['min']:.3g}  median {v['median']:.3g}  "
+                      f"(finite in {100 * v['frac_finite']:.0f}% of elements)")
         rows = sweep_static_cycles(mesh, cfg, solver, progress=_log)
         (out / "static_cycles_sweep.json").write_text(json.dumps(rows, indent=2))
         print("static_equivalent_cycles  response")

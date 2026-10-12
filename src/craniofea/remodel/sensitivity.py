@@ -56,6 +56,55 @@ def sweep_static_cycles(mesh: Mesh, cfg: StudyConfig, solver: Solver,
     return rows
 
 
+def critical_static_cycles(mesh: Mesh, cfg: StudyConfig, solver: Solver,
+                           scenario: str = "mewing") -> dict:
+    """Smallest static_equivalent_cycles at which `scenario` leaves the lazy zone.
+
+    At rho = 1 split each daily stimulus into cyclic and sustained parts,
+    Psi^m = A + n B  (A = sum over cyclic events n_i eps_i^m, B = sum over
+    sustained events eps_i^m, n = static_equivalent_cycles). Formation starts
+    where Psi_s / Psi_ref = 1 + w, i.e.
+
+        n_crit = [(1 + w)^m A_ref - A_s] / [B_s - (1 + w)^m B_ref]
+
+    (finite only where the denominator is positive). This is the first-step,
+    unsmoothed threshold; it does not depend on rates or on time.
+    Returns per-element n_crit (inf where never reached) and region minima.
+    """
+    from craniofea.materials import build_material
+    from craniofea.remodel.loading import build_daily_loading
+    from craniofea.remodel.simulate import REGIONS
+    from craniofea.remodel.stimulus import compute_stimulus
+
+    m, w = cfg.stimulus.m, cfg.remodeling.lazy_zone
+    mat = build_material(mesh, 1.0, cfg.materials)
+    parts = {}
+    for s in ("reference", scenario):
+        hist = build_daily_loading(mesh, cfg.loading, s)
+        st = compute_stimulus(mesh, mat, hist, solver, cfg.stimulus)
+        A, B = np.zeros(mesh.n_elems), np.zeros(mesh.n_elems)
+        for d in hist:
+            if d.static:
+                B += st.strains[d.name] ** m
+            else:
+                A += d.case.cycles_per_day * st.strains[d.name] ** m
+        parts[s] = (A, B)
+    (Ar, Br), (As, Bs) = parts["reference"], parts[scenario]
+    k = (1.0 + w) ** m
+    num, den = k * Ar - As, Bs - k * Br
+    bone = np.ones(mesh.n_elems, dtype=bool)
+    bone[np.asarray(mesh.elem_sets["suture_mid"], dtype=np.int64)] = False   # not remodeled
+    with np.errstate(divide="ignore", invalid="ignore"):
+        n_crit = np.where((den > 0) & bone, np.maximum(num, 0.0) / den, np.inf)
+    out = {"scenario": scenario, "lazy_zone": w, "m": m, "n_crit": n_crit}
+    for r in REGIONS:
+        ids = np.asarray(mesh.elem_sets[r], dtype=np.int64)
+        v = n_crit[ids]
+        out[r] = {"min": float(v.min()), "median": float(np.median(v)),
+                  "frac_finite": float(np.isfinite(v).mean())}
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Morris elementary effects
 # --------------------------------------------------------------------------- #

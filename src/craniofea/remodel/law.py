@@ -6,8 +6,9 @@ habit at the baseline density rho = 1. There is no global, hand-tuned
 setpoint: the reference habit is in equilibrium by construction and every
 other habit is evaluated relative to it.
 
-Error and rate (Carter 1984 "lazy"/dead zone; trilinear law of Beaupré et
-al. 1990, written for a relative density instead of a surface rate):
+Error and rate (trilinear "dead zone" law compared by Beaupré, Orr & Carter
+1990, the "lazy zone" of Huiskes et al. 1987; written here for a relative
+density instead of a surface apposition rate):
 
     S_e = Psi_e / Psi*_e - 1
     drho_e/dt = c_form (S_e - w)   if S_e >  w
@@ -20,10 +21,10 @@ Explicit Euler with step dt (days), re-solving the FE problem every step:
 
 Optional smoothing of S (default on): S is averaged to nodes (volume
 weighted, bone elements only) and back to elements (mean of the 4 nodes).
-This is a linear filter with a one-element-ring support that suppresses the
-element-scale checkerboard instability of element-based density laws
-(Jacobs et al. 1995 discuss the instability; nodal-based formulations are one
-remedy). It leaves a spatially uniform S unchanged and maps S = 0 to 0.
+This is a linear filter with a one-element-ring support that damps the
+element-scale checkerboard pattern known to arise in element-based density
+laws (see e.g. Garijo et al. 2014 on stability of remodeling schemes). It
+leaves a spatially uniform S unchanged and maps S = 0 to 0.
 """
 from __future__ import annotations
 

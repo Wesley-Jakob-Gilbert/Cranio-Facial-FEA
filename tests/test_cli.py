@@ -58,6 +58,8 @@ def test_sensitivity_command(tmp_path, capsys):
     assert main(["sensitivity", str(cfg), "--out", str(out), "--what", "all"]) == 0
     sweep = json.loads((out / "static_cycles_sweep.json").read_text())
     assert [r["static_equivalent_cycles"] for r in sweep] == [1.0, 1e6]
+    crit = json.loads((out / "critical_static_cycles.json").read_text())
+    assert crit["region_palatal_vault"]["min"] > 1.0
     morris = json.loads((out / "morris.json").read_text())
     assert {r["parameter"] for r in morris["table"]} == {"stimulus.m", "remodeling.lazy_zone"}
     assert morris["meta"]["evaluations"] == 2 * 3
