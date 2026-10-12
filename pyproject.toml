@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "craniofea"
+version = "0.2.0"
+description = "Differentiable finite-element and bone-remodeling pipeline for the adolescent maxilla"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Wesley Jakob Gilbert" }]
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "jax>=0.4.30",
+  "pyamg>=5.0",
+  "pyyaml>=6.0",
+  "matplotlib>=3.8",
+  "meshio>=5.3",
+]
+
+[project.optional-dependencies]
+gpu = ["jax[cuda12]"]
+viz = ["pyvista>=0.43", "imageio>=2.31"]
+remesh = ["gmsh>=4.11"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+craniofea = "craniofea.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "slow: long-running verification (deselect with -m 'not slow')",
+  "calculix: requires the ccx executable",
+  "febio: requires the febio4 executable",
+  "ct: requires the Open-Full-Jaw CT mesh in data/",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "NPY"]
