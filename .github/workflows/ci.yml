@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    env:
+      JAX_PLATFORMS: cpu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests scripts
+      - run: pytest -m "not slow and not calculix and not febio and not ct" -q
+
+  calculix:
+    name: cross-verification vs CalculiX
+    runs-on: ubuntu-latest
+    env:
+      JAX_PLATFORMS: cpu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y calculix-ccx
+      - run: pip install -e ".[dev]"
+      - run: pytest -m "calculix and not slow" -q
