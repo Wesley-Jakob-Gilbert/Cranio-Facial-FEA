@@ -56,3 +56,21 @@ The reference environment is WSL Ubuntu 22.04 with a `uv` venv at
 python -m pytest -m "not slow"     # fast suite (CI)
 python -m pytest                   # full verification suite
 ```
+
+## Canonical anatomical labels
+
+Every anatomical mesh (CT import, coarse remesh, parametric template) provides
+the same names so that loading, materials and reporting are mesh-agnostic.
+
+| Kind | Name | Meaning |
+|---|---|---|
+| frame | `Mesh.frame` | `lr` patient left->right, `ap` posterior->anterior, `si` inferior->superior |
+| surface set | `palate` | oral surface of the palatal vault (tongue contact) |
+| surface set | `occlusal` | alveolar crest / tooth-socket surface that carries bite reactions |
+| surface set | `fixed` | cut surfaces where the maxilla joins the cranial base / zygoma |
+| surface set | `all` | complete outward boundary |
+| node set | `fixed` | nodes of the `fixed` surface (all dofs clamped) |
+| elem set | `cortical`, `cancellous`, `suture_mid` | material layers (disjoint, cover all elements) |
+| elem set | `region_palatal_vault`, `region_alveolar_anterior`, `region_alveolar_posterior`, `region_basal` | reporting regions (disjoint, cover all elements) |
+| elem field | `depth` | (M,) distance from element centroid to the outer surface, m |
+| elem field | `surface_normal` | (M,3) unit outward normal of the nearest boundary face |
