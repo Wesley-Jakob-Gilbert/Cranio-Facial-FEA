@@ -41,9 +41,9 @@ def box_mesh(lx: float, ly: float, lz: float, nx: int, ny: int, nz: int,
     def nid(i, j, k):
         return (i * (ny + 1) + j) * (nz + 1) + k
 
-    I, J, K = np.meshgrid(np.arange(nx), np.arange(ny), np.arange(nz), indexing="ij")
-    I, J, K = I.ravel(), J.ravel(), K.ravel()
-    corners = np.stack([nid(I + c[0], J + c[1], K + c[2]) for c in _CORNER], axis=1)
+    ii, jj, kk = (g.ravel() for g in np.meshgrid(np.arange(nx), np.arange(ny), np.arange(nz),
+                                                 indexing="ij"))
+    corners = np.stack([nid(ii + c[0], jj + c[1], kk + c[2]) for c in _CORNER], axis=1)
 
     # Kuhn: walk from corner 0 to corner 7 adding one axis bit at a time.
     tets = []
@@ -69,6 +69,28 @@ def box_mesh(lx: float, ly: float, lz: float, nx: int, ny: int, nz: int,
 
 _TET_FACES = np.array([[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]])
 _OPPOSITE = np.array([3, 2, 1, 0])
+#: Local vertex triples of the four faces of a positively oriented tet (outward winding).
+TET_FACES = _TET_FACES
+
+
+def face_keys(faces: np.ndarray) -> np.ndarray:
+    """Orientation-independent integer key per triangle (equal keys <=> same vertex set).
+
+    Packs the sorted vertex ids into one int64 (21 bits each) when ids < 2**21,
+    otherwise falls back to a structured row view. Either way keys sort
+    lexicographically by sorted vertex ids, so they can be used with
+    np.unique / np.searchsorted / np.isin.
+    """
+    s = np.sort(np.asarray(faces), axis=1).astype(np.int64)
+    if s.size == 0 or s.max() < (1 << 21):
+        return (s[:, 0] << 42) | (s[:, 1] << 21) | s[:, 2]
+    return np.ascontiguousarray(s).view([("a", np.int64), ("b", np.int64), ("c", np.int64)])[:, 0]
+
+
+def face_multiplicity(faces: np.ndarray) -> np.ndarray:
+    """(F,) number of times each triangle's vertex set occurs in `faces`."""
+    _, inv, cnt = np.unique(face_keys(faces), return_inverse=True, return_counts=True)
+    return cnt[inv.ravel()]
 
 
 def boundary_faces(nodes: np.ndarray, tets: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -80,9 +102,7 @@ def boundary_faces(nodes: np.ndarray, tets: np.ndarray) -> tuple[np.ndarray, np.
     all_faces = tets[:, _TET_FACES].reshape(-1, 3)
     owner = np.repeat(np.arange(len(tets)), 4)
     opposite = tets[:, _OPPOSITE].reshape(-1)
-    key = np.sort(all_faces, axis=1)
-    _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
-    is_bnd = cnt[inv.ravel()] == 1
+    is_bnd = face_multiplicity(all_faces) == 1
     f, own, opp = all_faces[is_bnd], owner[is_bnd], opposite[is_bnd]
     x = nodes[f]
     n = np.cross(x[:, 1] - x[:, 0], x[:, 2] - x[:, 0])
