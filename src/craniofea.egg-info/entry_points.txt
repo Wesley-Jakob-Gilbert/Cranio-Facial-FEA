@@ -1,0 +1,2 @@
+[console_scripts]
+craniofea = craniofea.cli:main

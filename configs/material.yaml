@@ -90,6 +90,6 @@ materials:
     nu12: 0.30
     nu13: 0.32
     nu23: 0.28
-    # CalculiX *ELASTIC, TYPE=ORTHO format (single line, 9 values):
-    #   E1, E2, nu12, E3, nu13, nu23, G12, G13, G23
+    # Written as CalculiX *ELASTIC, TYPE=ENGINEERING CONSTANTS:
+    #   E1, E2, E3, nu12, nu13, nu23, G12, G13 / G23  (global x, y, z axes)
     # See CalculiX 2.21 manual §6.5.
