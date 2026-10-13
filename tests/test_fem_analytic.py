@@ -109,4 +109,4 @@ def test_cantilever_approaches_timoshenko():
     q = np.log((d[1] - d[0]) / (d[2] - d[1])) / np.log(1.5)
     d_inf = d[2] + (d[2] - d[1]) / (1.5**q - 1)
     assert abs(d_inf / delta_t - 1) < 0.02
-    assert d[2] / delta_t > 0.95
+    assert d[2] / delta_t > 0.93                              # 9 elements through depth

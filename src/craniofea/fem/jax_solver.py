@@ -256,20 +256,34 @@ def _assemble_blocks(grads, C, w, inv, brow, bcol, diag_idx, cons, *, chunk):
     return data.at[diag_idx].add(dfix[:, :, None] * jnp.eye(3))
 
 
-@jax.jit
-def _block_diagonal(grads, C, w, tets, cons):
+@partial(jax.jit, static_argnames=("chunk",))
+def _block_diagonal(grads, C, w, tets, cons, *, chunk):
     """Nodal 3x3 diagonal blocks of the decoupled operator, and the free mask."""
     n = cons.shape[0]
-    B = kernels.b_blocks(grads)
-    CB = jnp.einsum("mkl,malj->makj", C, B)
-    kaa = jnp.einsum("maki,makj->maij", B, CB) * w[:, None, None, None]
-    D = jnp.zeros((n, 3, 3)).at[tets.reshape(-1)].add(kaa.reshape(-1, 3, 3))
+
+    def body(i, D):
+        sl = partial(lax.dynamic_slice_in_dim, start_index=i * chunk, slice_size=chunk)
+        B = kernels.b_blocks(sl(grads))
+        CB = jnp.einsum("mkl,malj->makj", sl(C), B)
+        kaa = jnp.einsum("maki,makj->maij", B, CB) * sl(w)[:, None, None, None]
+        return D.at[sl(tets).reshape(-1)].add(kaa.reshape(-1, 3, 3))
+
+    D = lax.fori_loop(0, grads.shape[0] // chunk, body, jnp.zeros((n, 3, 3)))
     d = jnp.diagonal(D, axis1=1, axis2=2)
     empty = d == 0
     keep = 1.0 - jnp.maximum(cons, empty.astype(cons.dtype))
     D = D * keep[:, :, None] * keep[:, None, :]
     D = D + (jnp.where(empty, 1.0, d) * (1.0 - keep))[:, :, None] * jnp.eye(3)
     return D, keep
+
+
+def _inv3(D):
+    """Batched inverse of (N, 3, 3) matrices by cofactors (no LU workspace)."""
+    c0 = jnp.cross(D[:, 1], D[:, 2])
+    c1 = jnp.cross(D[:, 2], D[:, 0])
+    c2 = jnp.cross(D[:, 0], D[:, 1])
+    det = jnp.einsum("ni,ni->n", D[:, 0], c0)
+    return jnp.stack([c0, c1, c2], axis=-1) / det[:, None, None]
 
 
 def _decoupled_matvec(grads, C, w, tets, keep, dcons, x):
@@ -667,9 +681,10 @@ class JaxSolver:
     # -- matrix-free JAX CG
     def _solve_jax_cg(self, sys_: _System, F, free, uD):
         t0 = time.perf_counter()
-        D, keep = _block_diagonal(sys_.grads, sys_.C, sys_.vol_j, sys_.tets, sys_.cons)
+        D, keep = _block_diagonal(sys_.grads, sys_.C, sys_.vol_j, sys_.tets, sys_.cons,
+                                  chunk=sys_.chunk)
         dcons = jnp.diagonal(D, axis1=1, axis2=2) * (1.0 - keep)
-        Dinv = jnp.linalg.inv(D)
+        Dinv = _inv3(D)
         Dinv.block_until_ready()
         t_setup = time.perf_counter() - t0
         U, infos = [], []
@@ -758,9 +773,10 @@ class DifferentiableSolver:
             return jax.pure_callback(self._host_solve, jax.ShapeDtypeStruct(R.shape, R.dtype),
                                      data, R, vmap_method="sequential")
         S = self.sys
-        D, keep = _block_diagonal(S.grads, S.C, S.vol_j * s_pad, S.tets, S.cons)
+        D, keep = _block_diagonal(S.grads, S.C, S.vol_j * s_pad, S.tets, S.cons,
+                                  chunk=S.chunk)
         dcons = jnp.diagonal(D, axis1=1, axis2=2) * (1.0 - keep)
-        Dinv = jnp.linalg.inv(D)
+        Dinv = _inv3(D)
 
         def one(b):
             x, it, _, rel = _jax_cg_solve(S.grads, S.C, S.vol_j * s_pad, S.tets, keep, dcons,

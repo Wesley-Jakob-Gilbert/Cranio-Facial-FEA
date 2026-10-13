@@ -38,7 +38,7 @@ def test_matrix_free_operator_equals_assembled_matrix():
     S = solver.prepare(prob)
     A = S.bsr(S.assemble())
     x = np.random.default_rng(0).normal(size=(prob.mesh.n_nodes, 3))
-    D, keep = js._block_diagonal(S.grads, S.C, S.vol_j, S.tets, S.cons)
+    D, keep = js._block_diagonal(S.grads, S.C, S.vol_j, S.tets, S.cons, chunk=S.chunk)
     dcons = jnp.diagonal(D, axis1=1, axis2=2) * (1 - keep)
     y = np.asarray(js._matvec(S.grads, S.C, S.vol_j, S.tets, keep, dcons, jnp.asarray(x)))
     assert np.allclose(y.ravel(), A @ x.ravel(), rtol=1e-12, atol=1e-12 * np.abs(y).max())
