@@ -87,7 +87,7 @@ class Mesh:
         np.savez_compressed(path, **arrays)
 
     @classmethod
-    def load(cls, path: str | Path) -> "Mesh":
+    def load(cls, path: str | Path) -> Mesh:
         import json
 
         d = np.load(path, allow_pickle=False)
