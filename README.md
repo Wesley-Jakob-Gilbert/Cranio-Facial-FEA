@@ -7,22 +7,15 @@ A computational pipeline that models how sustained tongue-on-palate posture ("me
 
 ---
 
-## Density Evolution: Mewing vs. Mouth Breathing
+## Status
 
-![Mewing vs Mouth Breathing — 12-cycle density evolution](results/comparison_animation.gif)
-
-*Left: mewing (2 kPa sustained tongue load on palatal vault). Right: mouth breathing (gravity only, no palatal load). Color = &Delta;&rho; from baseline; 12 remodeling cycles on CT-derived maxillary mesh.*
-
----
-
-## Key Results
-
-| Scenario | 12-Cycle Surface Trend | Interpretation |
-|----------|----------------------|----------------|
-| **Mewing** (2 kPa tongue load) | Localized bone formation on palatal vault (max &Delta;&rho; &asymp; +0.19), less overall surface resorption | Tongue pressure drives anabolic stimulus at the palate |
-| **Mouth breathing** (gravity only) | Uniform surface resorption, no localized formation | Absent palatal load produces disuse-driven bone loss |
-
-The divergence is consistent with Wolff's law and the mechanostat hypothesis: loaded bone strengthens, unloaded bone weakens. The spatial pattern — formation concentrated where the tongue contacts the palate — matches the expected mechanical stimulus distribution.
+A correctness review in October 2026 found defects in the remodeling feedback
+loop and in the cortical-bone material card (orthotropic engineering constants
+were written in CalculiX's stiffness-matrix format, giving a
+non-positive-definite cortex). These are fixed in the code on this branch.
+Results produced before the fixes, including the earlier density-evolution
+animation and summary table, are withdrawn; regenerated results will be
+published with the next release.
 
 ---
 

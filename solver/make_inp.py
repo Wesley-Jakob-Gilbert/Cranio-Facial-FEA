@@ -402,10 +402,13 @@ def _bin_elements(elem_list, density_map, rho_lo, rho_hi, bin_width, prefix):
 def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
     """Write *ELASTIC (isotropic or orthotropic) and *DENSITY cards.
 
-    If ortho dict is provided (and not None), writes TYPE=ORTHO card.
-    CalculiX ORTHO format (two lines, max 8 values per line):
-      Line 1: E1, E2, nu12, E3, nu13, nu23, G12, G13
+    If ortho dict is provided (and not None), writes an orthotropic card in
+    engineering constants. CalculiX TYPE=ENGINEERING CONSTANTS format:
+      Line 1: E1, E2, E3, nu12, nu13, nu23, G12, G13
       Line 2: G23
+    (TYPE=ORTHO expects stiffness entries D1111, D1122, ... instead; writing
+    engineering constants there gives a non-positive-definite material.)
+    Material axes are the global x, y, z axes (no *ORIENTATION).
     """
     if ortho:
         E1  = float(ortho["E1_pa"])
@@ -417,8 +420,8 @@ def _write_elastic_density(fh, E, nu, rho_mass, ortho=None):
         nu12 = float(ortho["nu12"])
         nu13 = float(ortho["nu13"])
         nu23 = float(ortho["nu23"])
-        fh.write("*ELASTIC, TYPE=ORTHO\n")
-        fh.write(f"{E1:.6e}, {E2:.6e}, {nu12:.6f}, {E3:.6e}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e},\n")
+        fh.write("*ELASTIC, TYPE=ENGINEERING CONSTANTS\n")
+        fh.write(f"{E1:.6e}, {E2:.6e}, {E3:.6e}, {nu12:.6f}, {nu13:.6f}, {nu23:.6f}, {G12:.6e}, {G13:.6e},\n")
         fh.write(f"{G23:.6e}\n")
     else:
         fh.write("*ELASTIC\n")
