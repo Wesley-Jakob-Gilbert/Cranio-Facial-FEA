@@ -31,6 +31,7 @@ from craniofea.solvers import get_solver
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results"
+MORRIS_TRAJECTORIES = 6        # 6 x (14 + 1) = 90 template studies
 CT_STATIC_CYCLES = {"ct_default": 1.0, "ct_static_1e6": 1.0e6, "ct_static_1e7": 1.0e7}
 
 
@@ -53,7 +54,10 @@ def ct_studies() -> None:
             continue
         t0 = time.perf_counter()
         c = cfg.with_overrides({"stimulus.static_equivalent_cycles": n_static})
-        res = run_study(mesh, c, solver, progress=log)
+        # The reference habit is homeostatic by construction at any weighting;
+        # it is simulated once (default run) as a check and skipped afterwards.
+        scen = None if name == "ct_default" else list(cfg.sensitivity.contrast)
+        res = run_study(mesh, c, solver, scenarios=scen, progress=log)
         res.save(out)
         summary[name] = {
             "static_equivalent_cycles": n_static,
@@ -78,7 +82,8 @@ def ct_studies() -> None:
 
 def template_sensitivity() -> None:
     cfg = load_config(ROOT / "configs" / "study.yaml").with_overrides(
-        {"mesh.source": "template", "mesh.path": None})
+        {"mesh.source": "template", "mesh.path": None,
+         "sensitivity.morris.trajectories": MORRIS_TRAJECTORIES})
     mesh, src = load_study_mesh(cfg.mesh, log)
     solver = get_solver(cfg.solver.name, **cfg.solver.options)
     out = RESULTS / "template_sensitivity"
