@@ -1,0 +1,60 @@
+# Open-Full-Jaw patient-specific maxilla: import, anatomical frame and labels.
+# Lengths in mm, angles in degrees. See docs/MESH.md for the rationale of each rule.
+# Build with:  python scripts/build_meshes.py ct
+
+source:
+  patient: 3
+  # Obtain with:  python -m craniofea.data --patient 3   (CC BY-NC-SA 4.0, never commit data/)
+  msh: data/open_full_jaw/extracted/Patient_3/output/maxilla/volumetric_meshes/maxilla_volumetric_mesh.msh
+  scale_to_m: 0.001            # the dataset is in millimetres
+  tags: {teeth: 1, pdl: 2, bone: 3}   # gmsh geometrical tags (verified by volume/thickness)
+  keep: [bone]                 # bone-only model; sockets become free surfaces
+  min_normalized_volume: 1.0e-6
+
+frame:
+  # Automatic detection (PCA + mirror symmetry + arch/alveolar sign tests).
+  # The file is in DICOM LPS (x left, y posterior, z superior); to bypass the
+  # detection use e.g.  override: {ap: "-y", si: "+z"}   (lr = ap x si).
+  override: null
+
+labels:
+  fixed:
+    directions: [superior]     # planar crops searched toward these sides of the bone
+    angle_tol_deg: 12.0        # face normal vs plane normal
+    plane_tol_mm: 0.2          # > surface smoothing of the dataset pipeline (<= 0.07 mm)
+    search_depth_mm: 3.0       # crops are looked for within this distance of the extreme
+    min_area_fraction: 0.01    # smaller planar patches are not crops
+    palatal_exclusion_radius_mm: 2.0
+    palatal_max_thickness_mm: 5.0   # crop over palatal process thinner than this -> released
+    rims: true                 # add the superior rims of the buccal walls (buttresses)
+    rim_max_angle_deg: 50.0
+    rim_buccal_offset_mm: 1.5  # radially outside the dental arch by at least this much
+    rim_min_height_mm: 8.0     # above the alveolar crest (excludes the gingival region)
+    rim_min_component_fraction: 0.02
+  palate:
+    max_angle_deg: 75.0        # inferior-facing within this angle of -si (vault walls are steep)
+    min_socket_distance_mm: 2.0     # excludes alveolar crest and gingival margin
+    posterior_extension_mm: 15.0    # palatine shelves extend behind the last molars
+    last_tooth_band_mm: 8.0
+    posterior_wedge_slope: 1.0      # palate narrows toward the posterior nasal spine
+    pns_margin_mm: 1.0
+    min_component_fraction: 0.05
+  occlusal:
+    crest_distance_mm: 1.0     # crest = inferior-facing bone within this of a socket
+    crest_max_angle_deg: 70.0
+  layers:
+    cortical_thickness_mm: 1.5 # periosteal cortex (maxilla 1.0-2.0 mm in adolescents)
+    socket_lining_mm: 0.4      # lamina dura / alveolar bone proper
+    suture_half_width_mm: 0.5  # midpalatal suture modelled as a 1 mm slab
+    suture_nasal_margin_mm: 4.0     # slab limited to the palatal process thickness
+  regions:
+    anterior_fraction: 0.30    # canine/premolar transition, fraction of arch depth
+    alveolar_min_height_mm: 12.0    # alveolar process >= root length above the crest
+    vault_max_depth_mm: 8.0
+
+output: data/derived/patient3_maxilla.npz
+
+remesh:
+  sizes_mm: [2.0, 1.5, 1.0]
+  angle_deg: 40.0              # feature angle for gmsh classifySurfaces
+  output: data/derived/patient3_maxilla_h{size}.npz
