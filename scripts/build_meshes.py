@@ -69,7 +69,8 @@ def cmd_remesh(args) -> list[Path]:
     for h in sizes:
         try:
             mesh = remesh_ct(src, float(h), cfg.get("labels"),
-                             angle_deg=float(rcfg.get("angle_deg", 40.0)))
+                             method=rcfg.get("method", "ftetwild"),
+                             **rcfg.get("options", {}))
         except RemeshError as err:
             log.error("remesh at %.2f mm failed: %s", h, err)
             continue
@@ -107,9 +108,9 @@ def cmd_figures(args) -> None:
     FIGURES.mkdir(parents=True, exist_ok=True)
     meshes = _built_meshes()
     jobs = [("template", "mesh_template_labels.png",
-             "Parametric adolescent maxilla template: canonical labels", 0.0, 10.0),
+             "Parametric adolescent maxilla template: canonical labels", 0.0, 16.0),
             ("CT (Open-Full-Jaw P3)", "mesh_labels.png",
-             "Open-Full-Jaw patient 3 maxilla (bone only): canonical labels", 0.0, 10.0)]
+             "Open-Full-Jaw patient 3 maxilla (bone only): canonical labels", 0.0, 16.0)]
     for name, fname, title, ap, lr in jobs:
         if name not in meshes:
             log.warning("%s not built; skipping %s", name, fname)

@@ -23,7 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 gpu = ["jax[cuda12]"]
 viz = ["pyvista>=0.43", "imageio>=2.31"]
-remesh = ["gmsh>=4.11"]
+remesh = ["gmsh>=4.11", "pytetwild>=0.4"]
 dev = ["pytest>=8", "ruff>=0.5"]
 
 [project.scripts]

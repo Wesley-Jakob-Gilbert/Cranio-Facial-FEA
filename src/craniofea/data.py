@@ -3,11 +3,11 @@
 Open-Full-Jaw (Gholamalizadeh et al., "Open-Full-Jaw: An open-access dataset
 and pipeline for finite element models of human jaw", *Comput. Methods
 Programs Biomed.* 224:107009, 2022; https://github.com/diku-dk/Open-Full-Jaw)
-distributes one zip archive per patient through git LFS. A plain ``raw.githubusercontent.com`` URL returns
-only the 134-byte LFS *pointer*; the archive itself is served from
-``media.githubusercontent.com``. URLs are pinned to the repository commit
-below and every archive is verified against the sha256 recorded in its LFS
-pointer (which is the sha256 of the archive).
+distributes one zip archive per patient through git LFS. A plain
+``raw.githubusercontent.com`` URL returns only the 134-byte LFS *pointer*;
+the archive itself is served from ``media.githubusercontent.com``. URLs are
+pinned to the repository commit below and every archive is verified against
+the sha256 recorded in its LFS pointer (which is the sha256 of the archive).
 
 The dataset is licensed CC BY-NC-SA 4.0. Meshes derived from it (everything
 under ``data/``) must not be committed to this repository or redistributed

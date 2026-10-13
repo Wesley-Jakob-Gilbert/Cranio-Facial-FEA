@@ -55,6 +55,9 @@ labels:
 output: data/derived/patient3_maxilla.npz
 
 remesh:
+  # See docs/MESH.md: on this geometry gmsh fails (intersecting patches across
+  # sub-0.3 mm walls) and fTetWild needs > 15 min per mesh on 4 cores.
   sizes_mm: [2.0, 1.5, 1.0]
-  angle_deg: 40.0              # feature angle for gmsh classifySurfaces
+  method: ftetwild             # or gmsh
+  options: {epsilon: 0.002, opt_iterations: 10, stop_energy: 50.0, threads: 4}
   output: data/derived/patient3_maxilla_h{size}.npz

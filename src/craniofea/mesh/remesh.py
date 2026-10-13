@@ -1,7 +1,9 @@
-"""Re-meshing of the CT bone geometry at prescribed element sizes (gmsh).
+"""Re-meshing of the CT bone geometry at prescribed element sizes.
 
-For mesh-convergence studies the boundary of the imported CT mesh is
-re-parametrised and re-meshed at a target edge length:
+Two backends are provided. The default, fTetWild (`remesh_surface_ftetwild`),
+works within an envelope of the input surface and is robust to the
+sub-millimetre alveolar walls of the bone-only maxilla. The gmsh backend
+(`remesh_surface`) re-parametrises the boundary:
 
 1. the boundary triangulation is loaded into gmsh as a discrete surface,
 2. ``classifySurfaces`` splits it into patches at sharp edges (and into
@@ -16,7 +18,10 @@ from the PDL) are transferred from the source surface by nearest-face
 lookup with normal agreement. The anatomical frame of the source is reused,
 so all meshes of a convergence study share one coordinate system.
 
-gmsh is an optional dependency (``pip install craniofea[remesh]``).
+On the Open-Full-Jaw maxilla the gmsh route fails at every tested size
+(0.3-2 mm) because the reparametrised patches intersect across walls thinner
+than ~0.3 mm; it is kept for simpler geometries. Both backends are optional
+dependencies (``pip install craniofea[remesh]``).
 """
 from __future__ import annotations
 
@@ -154,29 +159,63 @@ def remesh_surface(nodes: np.ndarray, faces: np.ndarray, size: float,
     return out_nodes, out_tets
 
 
-def remesh_ct(source: Mesh, size_mm: float, labels: dict | None = None,
-              angle_deg: float = 40.0, min_size_mm: float = 0.4,
-              elements_through_thickness: float = 1.0, **kwargs) -> Mesh:
-    """Re-mesh a labeled CT mesh with maximum edge length `size_mm` and relabel it.
+def remesh_surface_ftetwild(nodes: np.ndarray, faces: np.ndarray, size: float,
+                            epsilon: float = 2e-3, opt_iterations: int = 10,
+                            stop_energy: float = 50.0, threads: int = 2
+                            ) -> tuple[np.ndarray, np.ndarray]:
+    """Tetrahedralise a closed surface with fTetWild (Hu et al., *ACM Trans. Graph.*
+    39(4), 2020), the mesher used to build Open-Full-Jaw itself.
 
-    The size is reduced in walls thinner than `size_mm` (`thickness_sizes`),
-    down to `min_size_mm`.
+    fTetWild only requires the output surface to stay within an envelope of
+    `epsilon` x (bounding-box diagonal) of the input, so it tolerates walls
+    thinner than the target size that defeat reparametrising remeshers.
+    """
+    try:
+        import pytetwild
+    except ImportError as err:
+        raise RemeshError("pytetwild is not installed (pip install craniofea[remesh])") from err
+    v, f, _ = compact(np.asarray(nodes, float), np.asarray(faces, np.int64))
+    out_v, out_t = pytetwild.tetrahedralize(v, f.astype(np.int32), edge_length_abs=size,
+                                            epsilon=epsilon, num_opt_iter=opt_iterations,
+                                            stop_energy=stop_energy, num_threads=threads,
+                                            quiet=True)
+    if len(out_t) == 0:
+        raise RemeshError("fTetWild produced no tetrahedra")
+    return compact(np.asarray(out_v, float), np.asarray(out_t, np.int64))[:2]
+
+
+def remesh_ct(source: Mesh, size_mm: float, labels: dict | None = None,
+              method: str = "ftetwild", angle_deg: float = 40.0, min_size_mm: float = 0.4,
+              elements_through_thickness: float = 1.0, **kwargs) -> Mesh:
+    """Re-mesh a labeled CT mesh with target edge length `size_mm` and relabel it.
+
+    method: ``"ftetwild"`` (default, robust) or ``"gmsh"`` (reparametrised
+    surface; the size is reduced in walls thinner than `size_mm`, see
+    `thickness_sizes`, down to `min_size_mm`).
     """
     from craniofea.mesh.labeling import label_ct_mesh
 
     t0 = time.time()
     src_mm = source.nodes / MM
-    sizes = thickness_sizes(src_mm, source.tets, source.elem_fields["depth"] / MM, size_mm,
-                            min_size_mm, elements_through_thickness)
-    nodes_mm, tets = remesh_surface(src_mm, source.surface_sets["all"], size_mm,
-                                    angle_deg=angle_deg, size_min_factor=min_size_mm / size_mm,
-                                    background=(src_mm, source.tets, sizes), **kwargs)
-    del sizes, src_mm
+    if method == "ftetwild":
+        nodes_mm, tets = remesh_surface_ftetwild(src_mm, source.surface_sets["all"], size_mm,
+                                                 **kwargs)
+    elif method == "gmsh":
+        sizes = thickness_sizes(src_mm, source.tets, source.elem_fields["depth"] / MM,
+                                size_mm, min_size_mm, elements_through_thickness)
+        nodes_mm, tets = remesh_surface(src_mm, source.surface_sets["all"], size_mm,
+                                        angle_deg=angle_deg,
+                                        size_min_factor=min_size_mm / size_mm,
+                                        background=(src_mm, source.tets, sizes), **kwargs)
+        del sizes
+    else:
+        raise ValueError(f"unknown remesh method {method!r}")
+    del src_mm
     nodes = nodes_mm * MM
     tets = orient_tets(nodes, tets)
     faces, _ = boundary_faces(nodes, tets)
     mesh = Mesh(nodes=nodes, tets=tets, surface_sets={"all": faces}, frame=source.frame,
-                meta={"source": "Open-Full-Jaw (gmsh remesh)", "target_size_mm": size_mm,
+                meta={"source": f"Open-Full-Jaw ({method} remesh)", "target_size_mm": size_mm,
                       "min_size_mm": min_size_mm,
                       "remesh_seconds": None, "parent": source.meta.get("source_file"),
                       "frame": {"method": "inherited from source mesh"}})
