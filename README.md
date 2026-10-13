@@ -1,181 +1,149 @@
-# Cranio-Facial FEA: Adolescent Bone Remodeling Under Tongue Posture
+# craniofea — does tongue posture remodel the adolescent maxilla?
 
-A computational pipeline that models how sustained tongue-on-palate posture ("mewing") versus mouth breathing influences adolescent maxillary bone density over time, using finite element analysis and Huiskes strain-adaptive remodeling.
+[![CI](https://github.com/Wesley-Jakob-Gilbert/Cranio-Facial-FEA/actions/workflows/ci.yml/badge.svg)](https://github.com/Wesley-Jakob-Gilbert/Cranio-Facial-FEA/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.12-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-> **This is a mechanobiological hypothesis explorer, not a clinical predictor.**
-> All outputs are comparative and directional. See [docs/SCIENTIFIC_CAVEATS.md](docs/SCIENTIFIC_CAVEATS.md) for full limitations.
+A verified, differentiable finite-element and bone-remodeling pipeline for a
+CT-derived human maxilla, built to test one popular claim mechanistically:
+that sustained tongue-on-palate posture ("mewing") strengthens the maxilla,
+while mouth breathing (tongue low) weakens it.
 
----
+> **Hypothesis explorer, not a clinical predictor.** Every result is relative
+> to a reference habit and depends on stated assumptions; see
+> [docs/METHODS.md](docs/METHODS.md) §8 for limitations.
 
-## Status
+## Key finding
 
-A correctness review in October 2026 found defects in the remodeling feedback
-loop and in the cortical-bone material card (orthotropic engineering constants
-were written in CalculiX's stiffness-matrix format, giving a
-non-positive-definite cortex). These are fixed in the code on this branch.
-Results produced before the fixes, including the earlier density-evolution
-animation and summary table, are withdrawn; regenerated results will be
-published with the next release.
+Under a literature-calibrated daily-stimulus remodeling model
+(Carter/Beaupré, m = 4) on the Open-Full-Jaw patient-3 maxilla, a 2 kPa
+sustained posture **changes bone density nowhere**: the palate's daily
+mechanical stimulus is dominated by ~600 swallows and ~1,500 chewing cycles,
+and a static load counts as one cycle per day. Mewing and mouth breathing
+are indistinguishable.
 
----
+The effect appears only if sustained loading is weighted as roughly
+**10<sup>6</sup> load cycles per day** — more than ten times what holding the
+posture all day at 1 Hz would represent. The model therefore turns a vague
+claim into a sharp, falsifiable question: *is a static palatal pressure
+roughly a million times more osteogenic per day than current evidence on
+static loading suggests?*
 
-## Method
+<p align="center">
+  <img src="docs/figures/result_threshold.png" width="49%" alt="Sustained-load weighting needed for apposition, CT palate">
+  <img src="docs/figures/result_sweep.png" width="49%" alt="Palatal contrast versus sustained-load weighting">
+</p>
 
-### Geometry
+<!-- CT_RESULTS_TABLE -->
 
-CT-derived maxillary mesh from the [Open-Full-Jaw](https://github.com/diku-dk/Open-Full-Jaw) dataset (Patient 3): **184,617 nodes, 853,068 C3D4 tetrahedral elements**. The volumetric mesh is spatially labeled into material zones via boundary-face and centroid heuristics:
+<p align="center">
+  <img src="docs/figures/result_ct_contrast.png" width="95%" alt="12-month density difference, mewing minus mouth breathing, three weightings">
+</p>
 
-- **Cortical bone** (139,362 elements) — surface layer (elements with boundary faces), E = 15 GPa
-- **Cancellous bone** (694,073 elements) — interior bone, E = 0.5 GPa
-- **Midpalatal suture** (17,033 elements) — compliant sagittal midplane zone, E = 50 MPa
-- **Lateral sutures** (2,600 elements) — anterior-lateral compliant zones, E = 50 MPa
+<details>
+<summary>Animation: what the hypothesis would predict at 10<sup>7</sup> cycles/day (hypothetical)</summary>
+<p align="center"><img src="docs/figures/result_ct_evolution.gif" width="90%" alt="Monthly density evolution at 1e7 cycles/day"></p>
+</details>
 
-A parametric template mesh (2,112 C3D8 hex elements) is also available for fast iteration via the `profile` setting in `configs/geometry.json`.
+## What is in the repository
 
-### Loading
+| Component | What it does | Evidence |
+|---|---|---|
+| **JAX FE solver** (`craniofea.fem`) | Linear-elastic tet4, vectorised JAX kernels, AMG-preconditioned CG with rigid-body deflation for 17 GPa / 10 MPa contrast, implicit-adjoint gradients (`jax.grad` through the solve) | Patch test exact to 1e-14; O(h²) displacement / O(h) stress convergence (Lamé, self-weight); adjoint vs finite differences 2e-9; 840k tets solved in ~30 s on a laptop CPU — [VERIFICATION.md](docs/VERIFICATION.md) |
+| **CalculiX & FEBio backends** (`craniofea.backends`) | Same `Problem` written to `.inp` / `.feb` (per-element anisotropic materials, per-face pressures, gravity), run, parsed back | Agreement with the reference solver: CalculiX ~1e-7, FEBio O(strain) — [BACKENDS.md](docs/BACKENDS.md) |
+| **CT pipeline** (`craniofea.mesh`, `craniofea.data`) | Downloads Open-Full-Jaw with checksums, separates bone from teeth/PDL, detects the anatomical frame, labels palate, tooth sockets, buttress fixation, cortical shell, midpalatal suture and reporting regions | [MESH.md](docs/MESH.md) |
+| **Remodeling model** (`craniofea.remodel`) | Daily loading history (resting posture, swallowing, chewing, gravity) → daily strain stimulus → site-specific homeostatic setpoint → lazy-zone density evolution | Every parameter sourced with a confidence rating — [METHODS.md](docs/METHODS.md) |
+| **Sensitivity analysis** | Analytic per-element threshold, static-weighting sweep, Morris screening over 14 uncertain inputs | `scripts/reproduce_results.py` |
 
-- **Surface-normal pressure**: tongue force acts perpendicular to the curved palatal surface at each node (area-weighted normals from adjacent element faces)
-- **Anterior-posterior gradient**: anterior palate receives 2.5x the pressure of the posterior palate, modeling real tongue-tip contact patterns
-- **Gravity body force**: self-weight loading on all elements via mass-consistent density cards
-- **Muscle loading** (optional): bilateral jaw-muscle resultant forces for load-case sensitivity studies
+<p align="center">
+  <img src="docs/figures/mesh_labels.png" width="80%" alt="Anatomical labels on the CT maxilla">
+</p>
 
-### Solver
+## Model in one screen
 
-[CalculiX](http://www.dhondt.de/) linear static solver (C3D4 tetrahedral elements, isotropic elastic materials). Each remodeling cycle runs a full FEA solve (~62 s on the 853k-element mesh), extracts element-level strain energy density from CalculiX ENER output, then updates density.
-
-### Remodeling Law
-
-Huiskes lazy-zone SED-stimulus bone remodeling ([Huiskes et al., 1987](https://doi.org/10.1016/0021-9290(87)90030-3)):
+For each element and each daily load event *i* (cycles nᵢ per day, from an
+FE solve), with strain energy density Uᵢ and isotropic-equivalent modulus E:
 
 ```
-SED = true strain energy density (from CalculiX *EL PRINT ENER)
-stimulus = (SED / SED_ref) - 1
-if stimulus >  s:  drho = alpha_app * (stimulus - s)    [apposition]
-if stimulus < -s:  drho = alpha_res * (stimulus + s)    [resorption]
-else:              drho = 0                              [lazy zone]
-rho(t+1) = clamp(rho(t) + drho, [rho_min, rho_max])
-E(t+1) = E_base * rho(t+1)^n
+effective strain     εᵢ = sqrt(2 Uᵢ / E)
+daily stimulus       Ψ  = ( Σᵢ nᵢ εᵢ^m )^(1/m)          m = 4; sustained events use n = static_equivalent_cycles
+setpoint             Ψ* = Ψ under the reference habit at ρ = 1   (site-specific homeostasis)
+error                S  = Ψ/Ψ* − 1, smoothed element → node → element
+density rate         dρ/dt = c (S ∓ w) outside the lazy zone |S| ≤ w, else 0
+stiffness            E = E_layer · ρ^n_layer   (cortical n = 3, orthotropic, surface-aligned; cancellous n = 2)
 ```
 
-Per-layer homeostatic SED setpoints (cortical vs. cancellous) and per-layer Carter-Hayes power law exponents (n=3 cortical, n=2 cancellous). Suture elements undergo strain-dependent modulus softening. Tooth root elements are held at fixed density.
+Scenarios differ only in resting palatal pressure: reference 0.2 kPa,
+mewing 2 kPa, mouth breathing 0 kPa; swallowing (15 kPa, 600/day) and
+chewing (100 N, 1,500/day) are shared. Because the setpoint is calibrated on
+the reference habit, the reference scenario is exactly homeostatic
+(|S| ≤ 1e-10 on the CT mesh), and no global setpoint is hand-tuned.
 
----
-
-## Quick Start
-
-### Prerequisites
-
-- **Python 3.8+** with `pip install -r requirements.txt`
-- **CalculiX** (`ccx`) in `PATH` — `sudo apt install calculix-ccx` on Ubuntu/WSL
-
-### Run the Full Pipeline
+## Quick start
 
 ```bash
-./scripts/reproduce_all.sh
+git clone https://github.com/Wesley-Jakob-Gilbert/Cranio-Facial-FEA && cd Cranio-Facial-FEA
+pip install -e ".[dev,viz]"            # add [gpu] for CUDA JAX, [remesh] for gmsh/fTetWild
+
+pytest -m "not slow"                    # ~200 tests, no data or external solvers needed
+craniofea study configs/study_template.yaml   # parametric arch, 1-2 minutes on a laptop CPU
 ```
 
-This runs mesh generation, all solver cases, field extraction, remodeling loop, animations, and post-processing in sequence.
-
-### Step-by-Step
+Full CT reproduction (about 4 h on a laptop CPU):
 
 ```bash
-# CT mesh (default — requires meshio: pip install meshio)
-python3 mesh/build_mesh_ct.py           # Convert CT .msh → mesh/mesh_data.json
-
-# Or template mesh (fast, no external data needed)
-python3 mesh/build_mesh.py              # Generate parametric mesh_data.json
-
-# Pipeline
-python3 solver/make_inp.py              # Generate CalculiX .inp decks
-./solver/run_case.sh mewing             # Solve a single case
-python3 post/extract_fields.py          # Extract displacement + stress + SED fields
-./scripts/remodeling_loop.sh            # 12-cycle remodeling (mewing + mouth_breathing)
-python3 post/make_animation.py          # Generate density evolution GIFs
+python -m craniofea.data                # fetch Open-Full-Jaw patient 3 (280 MB, sha256-verified)
+python scripts/build_meshes.py ct       # bone mesh, labels, quality report
+python scripts/reproduce_results.py     # CT studies, thresholds, sensitivity
+python scripts/make_figures.py          # figures in docs/figures/
 ```
 
-### Outputs
+Optional cross-verification: `apt install calculix-ccx`, and
+`scripts/install_febio.sh` builds FEBio 4 from source; then `pytest -m "calculix or febio"`.
 
-- `results/comparison_animation.gif` — side-by-side mewing vs. mouth-breathing density evolution
-- `results/<scenario>/density_evolution.gif` — per-scenario animation
-- `results/remodeling_summary.csv` — density statistics per cycle
-- `results/metrics_summary.csv` — displacement and stress peaks per load case
-- `results/mesh_quality_summary.json` — element quality metrics (Jacobian, aspect ratio)
-
----
-
-## Project Structure
+## Repository layout
 
 ```
-configs/          Configuration files (geometry, materials, loads, remodeling params)
-mesh/             Mesh generator and mesh_data.json
-solver/           CalculiX input deck generator, solver wrapper, .inp files
-post/             Post-processing: field extraction, remodeling engine, visualization
-scripts/          Pipeline runners, sensitivity sweeps, mesh quality checks
-docs/             Specifications, roadmap, scientific caveats
-results/          Generated outputs (gitignored except comparison GIF; reproduced via pipeline)
+src/craniofea/
+  model.py        data contract: Mesh, Material, LoadCase, Problem, Solution
+  fem/            JAX solver, constitutive laws, reference solver, verification problems
+  backends/       CalculiX and FEBio writers, runners, readers
+  mesh/           CT import, frame detection, labeling, template arch, quality, remeshing
+  remodel/        loading history, stimulus, remodeling law, studies, sensitivity
+  materials.py    tissue layers + density -> per-element stiffness
+  viz/            off-screen rendering and animations
+configs/          study and mesh configurations (all parameters documented)
+docs/             METHODS, VERIFICATION, MESH, BACKENDS, ARCHITECTURE
+scripts/          mesh building, verification, benchmarks, result reproduction, figures
+tests/            unit, verification and cross-solver tests
 ```
-
-### Load Cases
-
-| Case | Tongue (kPa) | Muscle (N) | Purpose |
-|------|-------------|-----------|---------|
-| `mewing` | 2.0 | 0 | Remodeling study: sustained tongue posture |
-| `mouth_breathing` | 0.0 | 0 | Remodeling study: absent palatal load (gravity only) |
-| `low/medium/high_kpa` | 0.5 / 2.0 / 5.0 | 0 | Single-shot load comparison |
-| `*_plus_muscle` | 0.5–5.0 | 2–8 | Tongue + jaw muscle combined loading |
-
----
-
-## Mesh Quality
-
-The CT mesh (run `python3 scripts/mesh_quality_report.py`):
-
-| Metric | Value |
-|--------|-------|
-| Elements | 853,068 (C3D4 tet) |
-| Nodes | 184,617 |
-| Source | Open-Full-Jaw Patient 3 |
-| Degenerate tets removed | ~0 (volume filter at build time) |
-
----
 
 ## Limitations
 
-This model explores the **directional hypothesis** that tongue posture affects maxillary bone remodeling. Key limitations:
+Linear elasticity on a fixed adult-derived geometry; no growth, no sutural
+biology, no soft-tissue or airway effects; the maxilla is clamped at its
+buttress cuts; loading magnitudes for deliberate tongue posture and chewing
+are weakly constrained. The central unknown, how osteogenic a sustained load
+is, has no measured value for human craniofacial bone — the model makes the
+dependence explicit rather than resolving it. Details in
+[METHODS.md §8](docs/METHODS.md#8-limitations) and [MESH.md](docs/MESH.md).
 
-- Material is isotropic linear elastic (cortical/cancellous split by boundary-face heuristic, not microstructural anisotropy)
-- Remodeling parameters are from hip/spine literature, not validated for craniofacial bone
-- Suture biology is modeled as mechanical compliance only, not cellular response
-- Mouth-breathing scenario includes only gravity — no baseline masticatory loading
-- Element set labeling (sutures, cortical/cancellous) uses spatial heuristics, not manual segmentation
+## History
 
-For a thorough discussion, see [docs/SCIENTIFIC_CAVEATS.md](docs/SCIENTIFIC_CAVEATS.md).
+Version 0.2 replaces an earlier script-based CalculiX pipeline. A review in
+October 2026 found that it hand-tuned its setpoints, leaked state between
+scenarios, wrote an orthotropic material card in the wrong format (a
+non-positive-definite cortex), and meshed teeth and PDL as bone. Its results
+were withdrawn; nothing from it is reused here.
 
----
+## Data, licences and citation
 
-## Future Directions
+Code: MIT ([LICENSE](LICENSE)). The CT geometry comes from
+[Open-Full-Jaw](https://github.com/diku-dk/Open-Full-Jaw) (Gholamalizadeh et
+al., *Comput Methods Programs Biomed* 224:107009, 2022,
+doi:[10.1016/j.cmpb.2022.107009](https://doi.org/10.1016/j.cmpb.2022.107009)),
+licensed CC BY-NC-SA 4.0. It is downloaded on demand and never
+redistributed. Figures rendered from it (`docs/figures/mesh_labels.png`,
+`docs/figures/result_*`) are derivative works under CC BY-NC-SA 4.0.
 
-- FEBio or nonlinear solver integration for large-deformation suture mechanics (GPU-accelerated via CUDA)
-- Transversely isotropic cortical bone material model
-- Baseline masticatory loading for the mouth-breathing comparison
-- Multi-patient mesh comparison across Open-Full-Jaw dataset
-- Parameter sensitivity dashboard across remodeling constants
-
----
-
-## References
-
-1. Huiskes, R., et al. (1987). Adaptive bone-remodeling theory applied to prosthetic-design analysis. *J. Biomechanics*, 20(11-12), 1135-1150.
-2. Carter, D.R. & Hayes, W.C. (1977). The compressive behavior of bone as a two-phase porous structure. *J. Bone Joint Surg.*, 59(7), 954-962.
-3. Frost, H.M. (2003). Bone's mechanostat: A 2003 update. *Anat. Rec.*, 275A(2), 1081-1101.
-4. Mew, J.R.C. (2004). The postural basis of malocclusion: A philosophical overview. *Am. J. Orthod. Dentofac. Orthop.*, 126(6), 729-738.
-5. Proffit, W.R. (1978). Equilibrium theory revisited. *Angle Orthod.*, 48(3), 175-186.
-6. Gholamalizadeh, T., et al. (2022). Open-Full-Jaw: An open-access dataset and pipeline for finite element models of human jaw. *Computer Methods and Programs in Biomedicine*, 224, 107009.
-
-
-
----
-
-## License
-
-This project is provided for educational and research purposes. Not for clinical use.
+If you use this software, please cite it via [CITATION.cff](CITATION.cff).
