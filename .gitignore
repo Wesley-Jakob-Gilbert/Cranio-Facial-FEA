@@ -53,3 +53,6 @@ audit_*.md
 # CalculiX stray outputs (from --help, --version, or aborted runs)
 --help.*
 --version.*
+
+# Packaging
+*.egg-info/
