@@ -42,6 +42,8 @@ def stimulus_error(psi: np.ndarray, psi_star: np.ndarray, floor: float = 1e-6) -
     """
     psi = np.asarray(psi, float)
     psi_star = np.asarray(psi_star, float)
+    if not (np.all(np.isfinite(psi)) and np.all(np.isfinite(psi_star))):
+        raise FloatingPointError("non-finite daily stimulus or setpoint; check the FE solve")
     ok = psi_star > floor * psi_star.max()
     S = np.zeros_like(psi)
     S[ok] = psi[ok] / psi_star[ok] - 1.0

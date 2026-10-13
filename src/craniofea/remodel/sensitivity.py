@@ -67,9 +67,14 @@ def critical_static_cycles(mesh: Mesh, cfg: StudyConfig, solver: Solver,
 
         n_crit = [(1 + w)^m A_ref - A_s] / [B_s - (1 + w)^m B_ref]
 
-    (finite only where the denominator is positive). This is the first-step,
-    unsmoothed threshold; it does not depend on rates or on time.
-    Returns per-element n_crit (inf where never reached) and region minima.
+    n_crit = 0 where the scenario already forms at n = 0 (numerator < 0) and
+    inf where formation is never reached (numerator >= 0, denominator <= 0).
+    This is the first-step threshold of the per-element law: it ignores the
+    element->node->element smoothing used by default in run_study (smoothing
+    spreads the response, so isolated elements just above n_crit may not form
+    and neighbours of strongly loaded elements may form slightly below it), and
+    it does not depend on rates or time. Region statistics cover remodeling
+    bone only (sutures are excluded).
     """
     from craniofea.materials import build_material
     from craniofea.remodel.loading import build_daily_loading
@@ -95,11 +100,12 @@ def critical_static_cycles(mesh: Mesh, cfg: StudyConfig, solver: Solver,
     bone = np.ones(mesh.n_elems, dtype=bool)
     bone[np.asarray(mesh.elem_sets["suture_mid"], dtype=np.int64)] = False   # not remodeled
     with np.errstate(divide="ignore", invalid="ignore"):
-        n_crit = np.where((den > 0) & bone, np.maximum(num, 0.0) / den, np.inf)
+        n_crit = np.where(num < 0, 0.0, np.where(den > 0, num / den, np.inf))
+    n_crit = np.where(bone, n_crit, np.inf)
     out = {"scenario": scenario, "lazy_zone": w, "m": m, "n_crit": n_crit}
     for r in REGIONS:
         ids = np.asarray(mesh.elem_sets[r], dtype=np.int64)
-        v = n_crit[ids]
+        v = n_crit[ids[bone[ids]]]
         out[r] = {"min": float(v.min()), "median": float(np.median(v)),
                   "frac_finite": float(np.isfinite(v).mean())}
     return out

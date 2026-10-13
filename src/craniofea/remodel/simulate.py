@@ -220,7 +220,7 @@ def run_study(mesh: Mesh, cfg: StudyConfig, solver: Solver,
     err_hist: dict[str, np.ndarray] = {}
     shares: dict[str, dict[str, dict[str, float]]] = {}
     summary: list[dict] = []
-    solver_info: dict = {}
+    worst = {"relative_residual": 0.0, "iterations": 0, "n_solves": 0}
     for s in scen:
         history = build_daily_loading(mesh, cfg.loading, s)
         rho = np.ones(mesh.n_elems)
@@ -239,7 +239,12 @@ def run_study(mesh: Mesh, cfg: StudyConfig, solver: Solver,
             rate = remodel_rate(S, rc.lazy_zone, lay.c_form, lay.c_res)
             rho = update_density(rho, rate, dt, lay.rho_min, lay.rho_max)
             E[k], R[k + 1] = S, rho
-            solver_info = next(iter(stim.info.values()), {})
+            for inf in stim.info.values():
+                worst["n_solves"] += 1
+                worst["relative_residual"] = max(worst["relative_residual"],
+                                                 float(inf.get("relative_residual", 0.0)))
+                worst["iterations"] = max(worst["iterations"], int(inf.get("iterations", 0)))
+            log(f"scenario {s}: step {k + 1}/{K}, max |S| = {np.abs(S).max():.3g}")
         rho_hist[s], err_hist[s] = R, E
         summary += _summarise(s, R, rc, region_bone, vol)
         log(f"scenario {s}: done")
@@ -248,7 +253,7 @@ def run_study(mesh: Mesh, cfg: StudyConfig, solver: Solver,
                          rho=rho_hist, error=err_hist, summary=summary, shares=shares)
     result.manifest = provenance(cfg, mesh, solver, {
         "scenarios": scen, "wall_time_s": time.perf_counter() - t0,
-        "solver_info_last": solver_info,
+        "solver_worst": worst,
         "load_cases_reference": sorted(ref.strains),
     })
     return result

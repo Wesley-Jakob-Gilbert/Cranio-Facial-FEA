@@ -176,8 +176,8 @@ homeostasis is preserved exactly.
 error. Their scale comes from adult bone turnover: about 4 %/yr in cortical
 and about 28 %/yr in trabecular bone (Parfitt 1994, tabulated in Manolagas
 2000, via BioNumbers ID 109908). With an error one unit beyond the lazy zone
-(Psi twice the setpoint), the yearly density change then equals the yearly
-turnover fraction:
+(S - w = 1, i.e. Psi = (2 + w) Psi* = 2.1 Psi*), the yearly density change then
+equals the yearly turnover fraction:
 
     c_cortical = 0.04 / 365 = 1.1e-4 /day,    c_cancellous = 0.28 / 365 = 7.7e-4 /day
 

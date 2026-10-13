@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -98,6 +99,7 @@ def main() -> None:
     ap.add_argument("--skip-ct", action="store_true")
     ap.add_argument("--skip-sensitivity", action="store_true")
     args = ap.parse_args()
+    os.chdir(ROOT)                      # config paths are relative to the repo root
     RESULTS.mkdir(exist_ok=True)
     if not args.skip_ct:
         ct_studies()

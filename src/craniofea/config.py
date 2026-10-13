@@ -334,6 +334,10 @@ class MorrisConfig:
         _check(len(self.parameters) >= 1, "morris.parameters must not be empty")
 
 
+_REGIONS = ("region_palatal_vault", "region_alveolar_anterior", "region_alveolar_posterior",
+            "region_basal")
+
+
 @dataclass(frozen=True)
 class SensitivityConfig:
     static_cycles: list[float] = field(
@@ -347,6 +351,8 @@ class SensitivityConfig:
         for v in self.static_cycles:
             _nonneg("static_cycles entry", v)
         _check(len(self.contrast) == 2, "sensitivity.contrast must name two scenarios")
+        _check(self.region in _REGIONS,
+               f"sensitivity.region must be one of {_REGIONS} (got {self.region!r})")
 
 
 @dataclass(frozen=True)

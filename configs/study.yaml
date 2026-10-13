@@ -9,7 +9,7 @@ output_dir: results/study
 
 mesh:
   source: file
-  path: data/derived/patient3_maxilla.npz   # coarse CT remesh (Open-Full-Jaw patient 3)
+  path: data/derived/patient3_maxilla.npz   # CT bone mesh (Open-Full-Jaw patient 3)
   fallback: [template]                       # parametric arch if the CT mesh is absent
   template: {}
 

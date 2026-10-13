@@ -94,6 +94,11 @@ def compute_stimulus(mesh: Mesh, material: Material, history: list[DailyLoad],
     problem = Problem(mesh, material, fixed_nodes=np.asarray(fixed, dtype=np.int64),
                       load_cases=[d.case for d in history])
     sols: dict[str, Solution] = solver.solve(problem)
+    failed = [k for k, s in sols.items() if s.info.get("converged") is False]
+    if failed:
+        raise RuntimeError(f"linear solve did not converge for load case(s) {failed}: "
+                           + ", ".join(f"{k}: residual {sols[k].info.get('relative_residual')}"
+                                       for k in failed))
     E_eff = hill_modulus(material.C)
     strains = {d.name: effective_strain(sols[d.name].sed, E_eff) for d in history}
     n = cycle_weights(history, cfg.static_equivalent_cycles)
