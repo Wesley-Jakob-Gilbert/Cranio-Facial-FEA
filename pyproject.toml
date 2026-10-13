@@ -15,6 +15,7 @@ dependencies = [
   "scipy>=1.11",
   "jax>=0.4.30",
   "pyamg>=5.0",
+  "threadpoolctl>=3.1",
   "pyyaml>=6.0",
   "matplotlib>=3.8",
   "meshio>=5.3",
