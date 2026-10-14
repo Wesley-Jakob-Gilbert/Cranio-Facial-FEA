@@ -32,7 +32,7 @@ from craniofea.solvers import get_solver
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results"
 MORRIS_TRAJECTORIES = 6        # 6 x (14 + 1) = 90 template studies
-CT_STATIC_CYCLES = {"ct_default": 1.0, "ct_static_1e6": 1.0e6, "ct_static_1e7": 1.0e7}
+CT_STATIC_CYCLES = {"ct_default": 1.0, "ct_static_1e7": 1.0e7}
 
 
 def log(msg: str) -> None:
