@@ -2,7 +2,7 @@
 """Regenerate every result reported in the README.
 
 1. CT study (Open-Full-Jaw patient 3) at the literature default
-   static_equivalent_cycles = 1, and at 1e6 / 1e7 to show what weighting of
+   static_equivalent_cycles = 1, and at 1e7 to show what weighting of
    sustained loads the mewing hypothesis would require.
 2. Per-element critical static_equivalent_cycles on the CT mesh (analytic).
 3. Static-cycles sweep + Morris screening on the parametric template mesh.
