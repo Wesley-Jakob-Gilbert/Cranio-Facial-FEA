@@ -1,4 +1,0 @@
-matplotlib
-meshio
-numpy
-pyyaml

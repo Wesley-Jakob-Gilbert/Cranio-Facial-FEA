@@ -1,0 +1,110 @@
+# Main study: tongue posture habits and maxillary bone density (12 months).
+# Every value is documented with its source and confidence in docs/METHODS.md.
+# Units: SI (Pa, N, m, kg/m^3); time in days.
+# Numbers are written with a decimal point and signed exponent (1.5e+10) so that
+# YAML reads them as floats; plain "1.5e10" is also accepted by the loader.
+
+name: study
+output_dir: results/study
+
+mesh:
+  source: file
+  path: data/derived/patient3_maxilla.npz   # CT bone mesh (Open-Full-Jaw patient 3)
+  fallback: [template]                       # parametric arch if the CT mesh is absent
+  template: {}
+
+solver:
+  name: jax
+  options: {}
+
+materials:
+  cortical:
+    E: 1.5e+10            # Pa, isotropic value (used when anisotropy: isotropic)
+    nu: 0.30
+    n: 3.0                # Carter & Hayes 1977
+    mass_density: 1850.0
+    anisotropy: orthotropic
+    ortho:                # axis 1: ap projected on the plate, 3: surface normal
+      E1: 2.0e+10
+      E2: 1.3e+10
+      E3: 1.1e+10
+      G12: 5.0e+9
+      G13: 4.0e+9
+      G23: 3.5e+9
+      nu12: 0.30
+      nu13: 0.30
+      nu23: 0.30
+  cancellous:
+    E: 1.0e+9
+    nu: 0.30
+    n: 2.0                # Rice, Cowin & Bowman 1988
+    mass_density: 1000.0
+  suture:
+    E: 1.0e+7             # midpalatal suture, not remodeled
+    nu: 0.45
+    mass_density: 1100.0
+
+loading:
+  resting:
+    ap_ratio: 2.0         # anterior / posterior resting pressure (uncertain)
+  swallowing:
+    pressure: 1.5e+4      # Pa, peak tongue-palate pressure
+    cycles_per_day: 600.0 # Lear, Flanagan & Moorrees 1965 (~585/day)
+    ap_ratio: 1.0
+  mastication:
+    force: 100.0          # N, total bite reaction on the arch per chewing cycle
+    cycles_per_day: 1500.0
+    molar_weight: 3.0     # posterior / anterior traction ratio
+    inclination_deg: 0.0
+  gravity:
+    enabled: true
+    g: 9.81
+  scenarios:
+    reference:
+      resting_pressure: 200.0     # Pa, habitual resting tongue pressure (~0.1-0.2 kPa)
+      description: habitual resting tongue posture (defines the homeostatic setpoint)
+    mewing:
+      resting_pressure: 2000.0    # Pa, deliberate sustained tongue-on-palate posture
+      description: sustained tongue-on-palate posture
+    mouth_breathing:
+      resting_pressure: 0.0
+      description: tongue low, no palatal contact; swallowing and chewing unchanged
+
+stimulus:
+  m: 4.0
+  static_equivalent_cycles: 1.0   # THE key unknown; see the sensitivity sweep
+  setpoint_floor: 1.0e-6
+
+remodeling:
+  lazy_zone: 0.10
+  formation_rate: {cortical: 1.1e-4, cancellous: 7.7e-4}   # 1/day per unit error
+  resorption_rate: {cortical: 1.1e-4, cancellous: 7.7e-4}
+  rho_min: {cortical: 0.5, cancellous: 0.25}
+  rho_max: {cortical: 1.15, cancellous: 2.0}
+  days: 365.0
+  n_steps: 12
+  smoothing: true
+
+sensitivity:
+  region: region_palatal_vault
+  contrast: [mewing, mouth_breathing]
+  static_cycles: [0.0, 1.0, 1.0e+1, 1.0e+2, 1.0e+3, 1.0e+4, 8.64e+4, 1.0e+5, 1.0e+6, 1.0e+7]
+  morris:
+    trajectories: 10
+    levels: 4
+    seed: 0
+    parameters:
+      loading.scenarios.mewing.resting_pressure: {lo: 1.0e+3, hi: 4.0e+3}
+      loading.scenarios.reference.resting_pressure: {lo: 50.0, hi: 500.0}
+      loading.resting.ap_ratio: {lo: 0.5, hi: 3.0}
+      loading.swallowing.pressure: {lo: 5.0e+3, hi: 3.0e+4}
+      loading.swallowing.cycles_per_day: {lo: 230.0, hi: 1000.0}
+      loading.mastication.force: {lo: 50.0, hi: 250.0}
+      loading.mastication.cycles_per_day: {lo: 200.0, hi: 3300.0}
+      stimulus.m: {lo: 2.0, hi: 8.0}
+      stimulus.static_equivalent_cycles: {lo: 1.0, hi: 1.0e+6, log: true}
+      remodeling.lazy_zone: {lo: 0.0, hi: 0.3}
+      remodeling.formation_rate.cancellous: {lo: 2.0e-4, hi: 2.0e-3, log: true}
+      materials.cortical.ortho.E1: {lo: 1.5e+10, hi: 3.0e+10}
+      materials.cancellous.E: {lo: 3.0e+8, hi: 2.0e+9}
+      materials.suture.E: {lo: 1.0e+6, hi: 1.0e+8, log: true}

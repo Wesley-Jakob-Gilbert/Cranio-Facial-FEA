@@ -1,0 +1,30 @@
+# Parametric adolescent maxilla template (used by tests, CI and demos when the
+# CT data are absent). Lengths in mm. See src/craniofea/mesh/template.py.
+# Build with:  python scripts/build_meshes.py template
+
+geometry:
+  arch_width: 46.0          # crest-to-crest width at the tuberosities
+  arch_depth: 40.0          # posterior border -> incisor crest
+  arch_flatness: 0.0        # legacy template_maxilla_v2 shape term
+  arch_squareness: 2.8      # superellipse exponent (2 = legacy elliptic arch)
+  posterior_flare_deg: 4.0
+  buccal_half_width: 4.0    # crest -> buccal outline
+  buccal_height: 5.0
+  palatal_wall_width: 9.0   # crest -> vault roof
+  vault_height: 12.0        # palatal depth above the crest
+  palate_thickness: 3.5
+  body_height: 3.0          # cut plane above the nasal floor
+  body_band: 0.0            # bone reaches the cut plane buccal of the crest
+  body_transition: 4.0      # lateral nasal wall
+  posterior_bow: 1.5        # posterior nasal spine
+  plan_size: 2.4            # plan edge length -> ~15k tets
+  layers: 6
+  suture_half_width: 0.5
+
+labels:
+  # Shared rules (same keys as configs/mesh_ct.yaml); only differences listed.
+  template:
+    crest_half_width_mm: 3.0   # occlusal = inferior faces within this of the crest line
+    palate_min_q_mm: 4.0       # palate = inferior faces at least this far palatal of the crest
+
+output: data/derived/template_maxilla.npz

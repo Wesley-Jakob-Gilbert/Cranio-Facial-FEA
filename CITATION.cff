@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "craniofea: differentiable finite-element and bone-remodeling pipeline for the adolescent maxilla"
+authors:
+  - family-names: Gilbert
+    given-names: Wesley Jakob
+version: 0.2.0
+license: MIT
+repository-code: "https://github.com/Wesley-Jakob-Gilbert/Cranio-Facial-FEA"
+references:
+  - type: article
+    title: "Open-Full-Jaw: An open-access dataset and pipeline for finite element models of human jaw"
+    authors:
+      - family-names: Gholamalizadeh
+        given-names: Torkan
+    journal: "Computer Methods and Programs in Biomedicine"
+    volume: 224
+    start: 107009
+    year: 2022
+    doi: "10.1016/j.cmpb.2022.107009"

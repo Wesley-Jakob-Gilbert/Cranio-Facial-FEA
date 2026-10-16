@@ -1,58 +1,34 @@
 # Python
-*.pyc
 __pycache__/
+*.py[cod]
+*.egg-info/
 .venv/
 venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
 
-# CT mesh dataset (large, downloaded via pipeline)
+# Data: Open-Full-Jaw is CC BY-NC-SA 4.0 and is never redistributed here.
+# Fetch it with `python -m craniofea.data`; derived meshes are rebuilt locally.
 data/
 
-# System
-.DS_Store
-.claude/
-
-# Results (regenerated via pipeline; only comparison GIF committed)
-results/**
+# Generated results (reproduce with scripts/reproduce_results.py)
+results/*
 !results/.gitkeep
-!results/comparison_animation.gif
 
-# Generated mesh data (regenerated via build_mesh.py / build_mesh_ct.py)
-mesh/mesh_data.json
+# Solver scratch files
+*.frd
+*.dat
+*.sta
+*.cvg
+*.12d
+spooles.out
+*.xplt
+*.log
 
-# Generated solver input decks (regenerated via make_inp.py)
-solver/*.inp
-
-# Runtime solver artifacts
-solver/elem_density.json
-solver/suture_modulus.json
-
-# CalculiX solver outputs
-solver/*.frd
-solver/*.dat
-solver/*.sta
-solver/*.cvg
-solver/*.12d
-solver/spooles.out
-
-# AI agent coordination / session artifacts
-AGENT_COMMS*.md
-ASSUMPTIONS_LIMITATIONS.md
-AUDIT_REPORT.md
-CLAUDE.md
-MORNING_UPDATE.md
-NEXT_BLOCKERS.md
-PLAN.md
-PUBLISH_CHECKLIST.md
-SESSION_HANDOFF*.md
-TASK_BOARD.md
-ThingsToLearn.md
-WORKLOG.md
-audit_*.md
-*.bak_audit*
-
-# CalculiX stray outputs (from --help, --version, or aborted runs)
---help.*
---version.*
-
-# Packaging
-*.egg-info/
+# Editors / OS / local tooling
+.DS_Store
+.vscode/
+.idea/
+.claude/

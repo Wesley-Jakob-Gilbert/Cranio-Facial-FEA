@@ -1,0 +1,61 @@
+# Fast demonstration / CI study on the parametric template mesh (falls back to
+# the synthetic labeled box if the template builder is unavailable; the
+# substitution is logged and recorded in the manifest). Same physics as
+# configs/study.yaml with an isotropic cortex and the NumPy reference solver.
+
+name: study_template
+output_dir: results/study_template
+
+mesh:
+  source: template
+  fallback: [box]
+  template: {}
+  box: {}
+
+solver:
+  name: reference
+
+materials:
+  cortical: {E: 1.5e+10, nu: 0.30, n: 3.0, mass_density: 1850.0, anisotropy: isotropic}
+  cancellous: {E: 1.0e+9, nu: 0.30, n: 2.0, mass_density: 1000.0}
+  suture: {E: 1.0e+7, nu: 0.45, mass_density: 1100.0}
+
+loading:
+  resting: {ap_ratio: 2.0}
+  swallowing: {pressure: 1.5e+4, cycles_per_day: 600.0, ap_ratio: 1.0}
+  mastication: {force: 100.0, cycles_per_day: 1500.0, molar_weight: 3.0, inclination_deg: 0.0}
+  gravity: {enabled: true, g: 9.81}
+  scenarios:
+    reference: {resting_pressure: 200.0, description: "habitual resting tongue posture"}
+    mewing: {resting_pressure: 2000.0, description: "sustained tongue-on-palate posture"}
+    mouth_breathing: {resting_pressure: 0.0, description: "tongue low, no palatal contact"}
+
+stimulus: {m: 4.0, static_equivalent_cycles: 1.0}
+
+remodeling:
+  lazy_zone: 0.10
+  formation_rate: {cortical: 1.1e-4, cancellous: 7.7e-4}
+  resorption_rate: {cortical: 1.1e-4, cancellous: 7.7e-4}
+  rho_min: {cortical: 0.5, cancellous: 0.25}
+  rho_max: {cortical: 1.15, cancellous: 2.0}
+  days: 365.0
+  n_steps: 12
+  smoothing: true
+
+sensitivity:
+  region: region_palatal_vault
+  contrast: [mewing, mouth_breathing]
+  static_cycles: [0.0, 1.0, 1.0e+2, 1.0e+4, 8.64e+4, 1.0e+6, 1.0e+7]
+  morris:
+    trajectories: 6
+    levels: 4
+    seed: 0
+    parameters:
+      loading.scenarios.mewing.resting_pressure: {lo: 1.0e+3, hi: 4.0e+3}
+      loading.swallowing.pressure: {lo: 5.0e+3, hi: 3.0e+4}
+      loading.mastication.force: {lo: 50.0, hi: 250.0}
+      loading.mastication.cycles_per_day: {lo: 200.0, hi: 3300.0}
+      stimulus.m: {lo: 2.0, hi: 8.0}
+      stimulus.static_equivalent_cycles: {lo: 1.0, hi: 1.0e+6, log: true}
+      remodeling.lazy_zone: {lo: 0.0, hi: 0.3}
+      materials.cancellous.E: {lo: 3.0e+8, hi: 2.0e+9}
