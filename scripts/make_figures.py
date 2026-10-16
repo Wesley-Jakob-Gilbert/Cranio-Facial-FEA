@@ -147,8 +147,9 @@ def gif_ct_evolution(mesh: Mesh, run: str = "ct_static_1e7") -> None:
         month = data["mewing"]["times"][k] / (365.0 / 12)
         imgs = [render_surface_field(
             mesh, d[s][k], view="inferior", clim=(-lim, lim), cmap=DIVERGING,
-            label="Δρ" if s == "mouth_breathing" else "", show_scalar_bar=s == "mouth_breathing",
-            title=f"{LABEL[s]} — month {month:.0f}", window_size=(640, 600),
+            label="density change (hypothetical: 1e7 cycles/day)" if s == "mouth_breathing"
+            else "", show_scalar_bar=s == "mouth_breathing",
+            title=f"{LABEL[s]}, month {month:.0f}", window_size=(640, 600),
             background=SURFACE)
             for s in ("mewing", "mouth_breathing")]
         frames.append(side_by_side(imgs))

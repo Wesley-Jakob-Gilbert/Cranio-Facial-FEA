@@ -274,7 +274,27 @@ makes sweeps practical. Sweeping `static_equivalent_cycles` from 0 to 1e7
 gives a palatal contrast of exactly 0 up to 1e5, +6e-6 at 1e6 and +0.0066 at
 1e7: the same threshold behaviour as the CT mesh.
 
-<!-- MORRIS_RESULTS -->
+Morris screening (14 factors, ranges in `configs/study.yaml`, 6
+trajectories, 90 template studies) on the palatal contrast:
+
+| factor | mu* | sign |
+|---|---|---|
+| `stimulus.static_equivalent_cycles` (1 to 1e6, log) | 2.4e-3 | + |
+| `loading.mastication.force` | 1.6e-3 | - |
+| `loading.swallowing.pressure` | 1.0e-3 | - |
+| `materials.suture.E` | 5.1e-4 | - |
+| `loading.scenarios.reference.resting_pressure` | 3.6e-4 | - |
+| `loading.scenarios.mewing.resting_pressure` | 7.4e-5 | + |
+| all other factors (m, rates, lazy zone, moduli, cycle counts, AP ratio) | < 3e-6 | |
+
+The sustained-load weight dominates. Chewing force and swallowing pressure
+act against the posture effect because they raise the stimulus the posture
+must exceed. The posture's own pressure ranks low only because the response
+is exactly zero over most of the design. Morris statistics are a coarse
+summary of such a threshold response; the sweep and the analytic n_crit map
+are the more informative results.
+
+![Morris screening](figures/result_morris.png)
 
 ### Interpretation
 
