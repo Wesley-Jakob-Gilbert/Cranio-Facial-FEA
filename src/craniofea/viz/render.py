@@ -97,16 +97,19 @@ def render_surface_field(
     window_size: tuple[int, int] = (900, 760),
     zoom: float = 1.05,
     show_scalar_bar: bool = True,
+    background: str = "white",
+    nan_color: str = "#c3c2b7",
 ) -> np.ndarray:
     """Render an element field on the outer surface; returns the RGB image array."""
     pv = _require_pyvista()
     poly = surface_polydata(mesh, {"field": values})
     plotter = pv.Plotter(off_screen=True, window_size=window_size)
-    plotter.set_background("white")
+    plotter.set_background(background)
     sbar = dict(title=label, color="black", fmt="%.2f", vertical=False,
                 position_x=0.2, position_y=0.04, width=0.6, height=0.06,
                 title_font_size=18, label_font_size=15, n_labels=5)
     plotter.add_mesh(poly, scalars="field", cmap=cmap, clim=clim, smooth_shading=False,
+                     nan_color=nan_color,
                      show_scalar_bar=show_scalar_bar, scalar_bar_args=sbar,
                      ambient=0.25, diffuse=0.75, specular=0.05)
     if title:

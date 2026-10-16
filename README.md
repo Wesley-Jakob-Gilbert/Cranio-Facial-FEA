@@ -22,22 +22,34 @@ mechanical stimulus is dominated by ~600 swallows and ~1,500 chewing cycles,
 and a static load counts as one cycle per day. Mewing and mouth breathing
 are indistinguishable.
 
-The effect appears only if sustained loading is weighted as roughly
-**10<sup>6</sup> load cycles per day** — more than ten times what holding the
-posture all day at 1 Hz would represent. The model therefore turns a vague
-claim into a sharp, falsifiable question: *is a static palatal pressure
-roughly a million times more osteogenic per day than current evidence on
-static loading suggests?*
+The effect appears only if each day of sustained posture is counted as at
+least **5 × 10<sup>5</sup> load cycles** (first responding element in the
+palatal vault) and about **7 × 10<sup>6</sup>** for half of the vault: 6 to
+80 times more than holding the posture all day at 1 Hz would represent. The
+model therefore turns a vague claim into a sharp, falsifiable question: *is a
+static palatal pressure about a million times more osteogenic per day than
+current evidence on static loading suggests?*
 
 <p align="center">
   <img src="docs/figures/result_threshold.png" width="49%" alt="Sustained-load weighting needed for apposition, CT palate">
   <img src="docs/figures/result_sweep.png" width="49%" alt="Palatal contrast versus sustained-load weighting">
 </p>
 
-<!-- CT_RESULTS_TABLE -->
+| CT maxilla, 12 months | literature weighting (1 cycle/day) | hypothetical 10<sup>7</sup> cycles/day |
+|---|---|---|
+| Palatal vault mean Δρ, mewing | **0** (max \|S\| = 9 × 10<sup>-8</sup> vs lazy zone 0.1) | +0.0065 |
+| Palatal vault mean Δρ, mouth breathing | **0** | 0 |
+| Share of the palatal daily stimulus from the resting posture | 5 × 10<sup>-7</sup> % | 4.6 % (volume average over the vault) |
+| Reference habit (homeostasis check) | \|S\| ≤ 1.4 × 10<sup>-10</sup> | — |
+
+Mouth breathing never resorbs bone in this model: removing a 0.2 kPa resting
+load is negligible next to swallowing and chewing, which dominate the daily
+stimulus everywhere, including the palate (98 % from chewing at literature weighting; figure below).
+
+<p align="center"><img src="docs/figures/result_shares.png" width="80%" alt="Share of the daily stimulus by load case"></p>
 
 <p align="center">
-  <img src="docs/figures/result_ct_contrast.png" width="95%" alt="12-month density difference, mewing minus mouth breathing, three weightings">
+  <img src="docs/figures/result_ct_contrast.png" width="95%" alt="12-month density difference, mewing minus mouth breathing, two weightings">
 </p>
 
 <details>

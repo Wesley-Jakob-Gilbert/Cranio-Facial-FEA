@@ -53,7 +53,7 @@ def style() -> None:
         "xtick.color": MUTED, "ytick.color": MUTED, "text.color": INK,
         "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6,
         "axes.spines.top": False, "axes.spines.right": False,
-        "font.size": 10, "axes.titlesize": 11, "axes.titleweight": "semibold",
+        "font.size": 10, "axes.titlesize": 11, "axes.titleweight": "bold",
         "legend.frameon": False, "lines.linewidth": 2.0, "figure.dpi": 150,
     })
 
@@ -81,10 +81,13 @@ def fig_threshold(mesh: Mesh) -> None:
     if not path.exists():
         return
     n = np.load(path)["n_crit"]
-    # 0 = forms at any weight (bottom of the scale), inf = never (top of the scale)
+    # 0 = forms at any weight (bottom of the scale), inf = never (top of the scale);
+    # the midpalatal suture is not remodeled and is drawn neutral gray.
     v = np.log10(np.clip(np.where(np.isfinite(n), n, 1e12), 1e4, 1e12))
+    v[np.asarray(mesh.elem_sets["suture_mid"], dtype=np.int64)] = np.nan
     img = render_surface_field(mesh, v, view="inferior", clim=(4.0, 10.0), cmap=SEQUENTIAL,
-                               show_scalar_bar=False, window_size=(900, 820))
+                               show_scalar_bar=False, window_size=(900, 820),
+                               background=SURFACE)
     fig, ax = plt.subplots(figsize=(5.6, 5.4))
     ax.imshow(img)
     ax.set_axis_off()
@@ -94,8 +97,9 @@ def fig_threshold(mesh: Mesh) -> None:
                  color=INK2)
     cb.outline.set_visible(False)
     ax.set_title("How strongly must a 2 kPa posture count before bone responds?", loc="left")
-    fig.text(0.02, 0.01, "Inferior view, CT maxilla. Literature convention: 1 cycle/day; "
-             "posture held all day at 1 Hz: 8.6e4.", color=MUTED, fontsize=8)
+    fig.text(0.02, -0.06, "Inferior view, CT maxilla; gray: midpalatal suture (not remodeled).\n"
+             "Literature convention: 1 cycle/day; posture held all day at 1 Hz: 8.6e4.",
+             color=MUTED, fontsize=8)
     fig.savefig(FIG / "result_threshold.png", bbox_inches="tight")
     plt.close(fig)
 
@@ -113,15 +117,17 @@ def fig_ct_contrast(mesh: Mesh) -> None:
     fig, axes = plt.subplots(1, len(runs), figsize=(4.2 * len(runs), 4.4))
     for ax, (_, label), d in zip(np.atleast_1d(axes), runs, diffs, strict=True):
         img = render_surface_field(mesh, d, view="inferior", clim=(-lim, lim), cmap=DIVERGING,
-                                   show_scalar_bar=False, window_size=(800, 760))
+                                   show_scalar_bar=False, window_size=(800, 760),
+                                   background=SURFACE)
         ax.imshow(img)
         ax.set_axis_off()
         ax.set_title(f"sustained-load weight {label}", fontsize=10)
     sm = plt.cm.ScalarMappable(cmap=DIVERGING, norm=plt.Normalize(-lim, lim))
     cb = fig.colorbar(sm, ax=np.atleast_1d(axes).tolist(), orientation="horizontal",
                       fraction=0.05, pad=0.03, shrink=0.6)
+    cb.set_ticks(np.linspace(-lim, lim, 5))
     cb.set_label("Δρ after 12 months, mewing − mouth breathing  (red: less bone, "
-                 "blue: more bone)", color=INK2)
+                 "blue: more bone; gray strip: suture, not remodeled)", color=INK2)
     cb.outline.set_visible(False)
     fig.savefig(FIG / "result_ct_contrast.png", bbox_inches="tight")
     plt.close(fig)
@@ -142,7 +148,8 @@ def gif_ct_evolution(mesh: Mesh, run: str = "ct_static_1e7") -> None:
         imgs = [render_surface_field(
             mesh, d[s][k], view="inferior", clim=(-lim, lim), cmap=DIVERGING,
             label="Δρ" if s == "mouth_breathing" else "", show_scalar_bar=s == "mouth_breathing",
-            title=f"{LABEL[s]} — month {month:.0f}", window_size=(640, 600))
+            title=f"{LABEL[s]} — month {month:.0f}", window_size=(640, 600),
+            background=SURFACE)
             for s in ("mewing", "mouth_breathing")]
         frames.append(side_by_side(imgs))
     write_gif(frames, FIG / "result_ct_evolution.gif", fps=2.0)
@@ -164,6 +171,7 @@ def fig_timeseries(run: str = "ct_static_1e7") -> None:
         ax.axhline(0, color=AXIS, lw=0.8)
         ax.set_title(title, fontsize=10)
         ax.set_xlabel("month")
+        ax.set_xticks([0, 3, 6, 9, 12])
     axes[0].set_ylabel("mean Δρ (volume-weighted)")
     axes[0].legend(loc="upper left", fontsize=8)
     fig.suptitle("Regional density change if sustained loads were weighted at 10$^7$ "
@@ -181,13 +189,18 @@ def fig_shares(run: str = "ct_default") -> None:
     scen = "mewing" if "mewing" in shares else next(iter(shares))
     regs = [r for r in REGION if r in shares[scen]]
     cases = list(shares[scen][regs[0]])
-    fig, ax = plt.subplots(figsize=(7.5, 2.9))
+    fig, ax = plt.subplots(figsize=(8.4, 2.9))
     left = np.zeros(len(regs))
     for i, c in enumerate(cases):
         vals = np.array([shares[scen][r][c] for r in regs])
         ax.barh(range(len(regs)), vals, left=left, color=CASE_COLORS[i % 4], height=0.62,
                 edgecolor=SURFACE, linewidth=2, label=c.replace("_", " "))
         left += vals
+    rest = [c for c in cases if "rest" in c]
+    if rest:
+        for y, r in enumerate(regs):
+            ax.text(1.01, y, f"rest posture {100 * shares[scen][r][rest[0]]:.2g}%",
+                    va="center", fontsize=8, color=INK2, transform=ax.get_yaxis_transform())
     ax.set_yticks(range(len(regs)), [REGION[r] for r in regs])
     ax.invert_yaxis()
     ax.set_xlim(0, 1)

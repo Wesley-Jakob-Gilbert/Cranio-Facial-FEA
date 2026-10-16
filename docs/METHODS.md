@@ -242,23 +242,39 @@ a million load cycles per day before it moves any element out of the lazy
 zone. That is roughly ten times more than holding the posture all day at
 1 Hz.
 
-### Demonstration run (synthetic labeled box mesh)
+### Results on the CT maxilla (Open-Full-Jaw patient 3)
 
-`configs/study_template.yaml` was run on the reference solver. The parametric
-template builder was not yet available in this checkout, so the run used the
-synthetic box from `craniofea.remodel.demo.labeled_box_mesh` (315 nodes,
-1152 tets; 40 x 50 x 20 mm). The fallback is recorded in the manifest. The
-geometry is not anatomical, so only the orders of magnitude are meaningful.
+Produced by `scripts/reproduce_results.py` with `configs/study.yaml`
+(420,779 bone tets, JAX solver, orthotropic cortex, 12 monthly steps; every
+linear solve converged to a relative residual below 1e-10).
 
-| static_equivalent_cycles | 0 | 1 | 1e2 | 1e4 | 8.64e4 | 1e6 | 1e7 |
-|---|---|---|---|---|---|---|---|
-| vault mean delta-rho, mewing - mouth breathing, 12 months | 0 | 0 | 0 | 0 | 0 | +0.0003 | +0.027 |
+| quantity | literature weighting (n = 1) | n = 1e7 (hypothetical) |
+|---|---|---|
+| palatal vault mean delta-rho after 12 months, mewing | 0 | +0.0065 |
+| palatal vault mean delta-rho, mouth breathing | 0 | 0 |
+| max \|S\|, mewing | 9.2e-8 | 0.47 |
+| resting-posture share of the vault stimulus (volume average) | 5e-9 | 0.046 |
+| reference habit max \|S\| (homeostasis check) | 1.4e-10 | - |
 
-- With the default weight, every scenario stays inside the lazy zone (max |S| about 2e-7). No element changes density, so the predicted habit effect is exactly zero.
-- Minimum n_crit in the palatal vault is 3.1e5 (median 1.3e7). Changing the input changes this as follows: m = 2 gives 4.9e3; m = 8 gives 6.8e8; a 5 kPa swallowing pressure gives 4.9e3 at the minimum but a median of 1.2e7; removing chewing gives 2.8e5; an orthotropic cortex gives 3.1e5.
-- Mouth breathing never resorbs, at any weight. The reference resting pressure (200 Pa) contributes about (0.2/2)^4 = 1e-4 of what the mewing posture does, so removing it is indistinguishable from the reference habit.
-- At n = 1e7, the resting posture supplies 53 % of the vault stimulus. 90 % of the vault volume shows formation, with a mean delta-rho of +0.027 in a year.
-- Morris screening (8 factors, 6 trajectories, 54 evaluations) ranks `static_equivalent_cycles` first by an order of magnitude (mu* = 0.026). Next are swallowing pressure, chewing cycles and bite force, all with a negative effect because they raise the bar the posture must clear. The mewing resting pressure itself ranks low because the response is mostly exactly zero. Morris screening is poorly suited to a threshold response like this one; the sweep and n_crit are the more informative summaries.
+- At literature weighting, chewing supplies 98 % of the daily stimulus in the
+  palatal vault and over 99.99 % elsewhere; swallowing supplies the rest of
+  the vault's. At n = 1e7 the posture's share of the vault rises to 4.6 %.
+- The analytic threshold on the CT mesh: in the palatal vault the first
+  element responds at n = 5.3e5 and the median element at 7.0e6; the
+  alveolar and basal regions need 1e6 or more for the first element and
+  medians of 1e10 or more. The geometry-free estimate above (9e5) sits within
+  this range.
+- Mouth breathing never resorbs: its palatal mean delta-rho is exactly 0 at
+  every weight tested (template sweep 0 to 1e7; CT at 1 and 1e7).
+
+### Sensitivity on the parametric template
+
+The template arch (15,426 tets) runs a full study in about a minute, which
+makes sweeps practical. Sweeping `static_equivalent_cycles` from 0 to 1e7
+gives a palatal contrast of exactly 0 up to 1e5, +6e-6 at 1e6 and +0.0066 at
+1e7: the same threshold behaviour as the CT mesh.
+
+<!-- MORRIS_RESULTS -->
 
 ### Interpretation
 
