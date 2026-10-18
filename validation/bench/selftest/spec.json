@@ -1,0 +1,110 @@
+{
+ "mesh": "/home/user/workspace/Cranio-Facial-FEA/validation/bench/selftest/plate.msh",
+ "pots": [
+  {
+   "type": "halfspace",
+   "point": [
+    5,
+    0,
+    0
+   ],
+   "normal": [
+    -1,
+    0,
+    0
+   ]
+  },
+  {
+   "type": "halfspace",
+   "point": [
+    40,
+    0,
+    0
+   ],
+   "normal": [
+    1,
+    0,
+    0
+   ]
+  }
+ ],
+ "pad": {
+  "center": [
+   22.5,
+   25,
+   0
+  ],
+  "normal": [
+   0,
+   0,
+   -1
+  ],
+  "u_axis": [
+   1,
+   0,
+   0
+  ],
+  "half_u": 12.5,
+  "half_v": 20.0,
+  "rim_mm": 0.0
+ },
+ "material": {
+  "model": "M0",
+  "E_GPa": 12.5,
+  "nu": 0.35
+ },
+ "gauges": [
+  {
+   "id": "N_mid",
+   "center": [
+    25.5,
+    25,
+    4
+   ],
+   "dir": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "N_edge",
+   "center": [
+    8,
+    25,
+    4
+   ],
+   "dir": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "O_edge",
+   "center": [
+    8,
+    25,
+    0
+   ],
+   "dir": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "N_mid_long",
+   "center": [
+    25.5,
+    25,
+    4
+   ],
+   "dir": [
+    0,
+    1,
+    0
+   ]
+  }
+ ]
+}

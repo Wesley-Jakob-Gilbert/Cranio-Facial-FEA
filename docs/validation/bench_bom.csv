@@ -1,0 +1,40 @@
+category,item,part_number,qty,unit_price_usd,ext_price_usd,vendor,url,price_status,notes
+Gauges,Strain gauge rosette 0/45/90 unstacked 350 ohm STC 06 (5/pk),CEA-06-062URA-350,1,223.93,223.93,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=STRESS_ANALYSIS_STRAIN_GAGE,verified 2026-10-17,4 specimens x 1 rosette + 1 spare; unstacked rosettes recommended on bone
+Gauges,Uniaxial strain gauge 350 ohm STC 06 (5/pk),EA-06-062AQA-350,3,44.09,132.27,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=STRESS_ANALYSIS_STRAIN_GAGE,verified 2026-10-17,2 active + 1 dummy per specimen + 3 practice
+Gauges,M-Bond 200 cyanoacrylate kit,M-Bond 200,1,63.07,63.07,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,Adhesive used by Bright & Rayfield 2011
+Gauges,M-Prep Conditioner A,MCA-1,1,9.97,9.97,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,
+Gauges,M-Prep Neutralizer 5A,MN5A-1,1,9.97,9.97,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,
+Gauges,3140 RTV non-corrosive silicone coating 3 oz,3140 RTV,1,55.89,55.89,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,Waterproofing; do NOT use acetoxy aquarium silicone
+Gauges,Bondable solder terminals,CPF-75C,1,33.81,33.81,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,
+Gauges,Jumper wire 134-AWP 500 ft,134-AWP,1,37.98,37.98,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,Gauge tab to terminal
+Gauges,3-conductor lead wire 100 ft,326-DFV,1,59.63,59.63,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,3-wire quarter bridge leads
+Gauges,Cotton swabs,CSP-1,1,13.96,13.96,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,Generic pharmacy swabs acceptable
+Gauges,Gauze sponges,GSP-1,1,18.60,18.60,Micro-Measurements,https://shop.micro-measurements.com/my_cart_item_list.php?v_cat_code=ACCESSORIES,verified 2026-10-17,Generic sterile gauze acceptable
+Electronics,SparkFun Qwiic Scale NAU7802 24-bit ADC,SEN-15242,10,5.65,56.50,SparkFun,https://www.sparkfun.com/sparkfun-qwiic-scale-nau7802.html,verified 2026-10-17,10+ price; 9 bridges + load cell
+Electronics,I2C 8-channel mux PCA9548,Adafruit 5626,2,6.95,13.90,Adafruit,https://www.adafruit.com/product/5626,verified 2026-10-17,All NAU7802 share address 0x2A
+Electronics,QT Py RP2040 microcontroller,Adafruit 4900,1,9.95,9.95,Adafruit,https://www.adafruit.com/product/4900,verified 2026-10-17,Or Pico 2 $5.75 https://www.sparkfun.com/raspberry-pi-pico-2.html
+Electronics,STEMMA QT / Qwiic cable 100 mm,Adafruit 4210,14,0.95,13.30,Adafruit,https://www.adafruit.com/product/4210,verified 2026-10-17,
+Electronics,MPRLS ported pressure sensor 0-25 psi absolute,Adafruit 3965,1,29.95,29.95,Adafruit,https://www.adafruit.com/product/3965,verified 2026-10-17,~0-70 kPa gauge usable; isolate with stopcock above 60 kPa
+Electronics,TMP117 precision temperature sensor,Adafruit 4821,2,11.50,23.00,Adafruit,https://www.adafruit.com/product/4821,verified 2026-10-17,Specimen + air temperature
+Electronics,Perma-Proto half-size PCB 3-pack,Adafruit 571,1,8.95,8.95,Adafruit,https://www.adafruit.com/product/571,verified 2026-10-17,Bridge completion boards
+Electronics,S-type load cell 50 kg C3,Phidgets FRC4163_0,1,40.00,40.00,Phidgets,https://www.phidgets.com/?prodid=1319,verified 2026-10-17,Inline cup force; read by NAU7802
+Electronics,Bridge completion resistor 350 ohm 0.1%,IRC RC55LFT350RBT,10,4.41,44.10,Mouser,https://www.mouser.com/en/c/passive-components/resistors/?resistance=350%20Ohms&tolerance=0.1%20%25,verified 2026-10-17 (category listing),One per quarter bridge
+Electronics,Ratio-arm resistor 1 kohm 0.1% 25 ppm,Yageo MFP-25BRD52-1K,22,0.63,13.86,Mouser/Newark,https://www.newark.com/yageo/mfp-25brd52-1k/res-tht-1k-0-1-250mw/dp/49AK5830,verified 2026-10-17 (Mouser category price for MFP-25BRD52 series),2 per bridge + spares
+Electronics,Shunt calibration resistor 174 kohm 0.1%,Yageo MFP-25BRD52-174K,3,0.63,1.89,Mouser,https://www.mouser.com/en/c/passive-components/resistors/?m=YAGEO&termination%20style=Axial,UNVERIFIED exact value stocked; series price verified,-1003.7 ue on 350 ohm GF 2.0
+Electronics,"510 ohm 1% dropping resistors, hookup wire, solder",generic,1,0.00,0.00,Wes stock,,assumed on hand,
+Rig,Threaded rod 3/8 in x 6 ft zinc,Everbilt 23031,1,10.95,10.95,Home Depot,https://www.homedepot.com/b/Hardware-Metal-Stock-Metal-Rods/N-5yc1vZ2fkos9n,verified 2026-10-17,Cut to 2 posts; nuts/washers from stock (UNVERIFIED)
+Rig,Latex dental dam 6x6 medium 36 sheets,generic,1,13.13,13.13,eBay,https://www.ebay.com/b/Dental-Laboratory-Rubber-Dams-Rubber-Dam-Sheets/257857/bn_7112061927,verified 2026-10-17 (listing price),Bladder membrane; Crosstex at $36.79 alt https://www.newlinemedical.com/ph-dental-dam-1060005154728.html
+Rig,3-way stopcock luer,JorVet J0462,3,1.10,3.30,JorVet,https://jorvet.com/shop/jorvet-3-way-stopcock/,verified 2026-10-17,
+Rig,20 mL luer-lock syringes 50 pk,Filtrous LLS-10-0020,1,39.90,39.90,Filtrous,https://filtrous.com/products/luer-lock-syringe-sterile-20ml-50-unit,verified 2026-10-17,Screw-press pressure source
+Rig,"PETG/PLA filament, M3/M6 screws, steel dowels, plywood",generic,1,0.00,0.00,Wes stock,,assumed on hand,~400 g filament
+Potting,Bondo body filler 28 oz,PN0262,1,18.98,18.98,Home Depot,https://www.homedepot.com/p/Bondo-1-qt-28-oz-Body-Filler-PN0262/202077782,verified 2026-10-17,Pot material; E measured by 3-point bending
+Potting,Chrome steel balls 1/16 in (fiducials),1/16 loose ball,16,1.24,19.84,Bearings Direct,https://bearingsdirect.com/1-16-loose-chrome-ball-bearing/,verified 2026-10-17,4 per pot x 2 pots x 2 sets
+Potting,Mold Star 15 Slow trial unit (fallback cast pad),Mold Star 15,0,36.77,0.00,Smooth-On,https://shop.smooth-on.com/mold-star-15-slow,verified 2026-10-17,"OPTIONAL, qty 0 in total"
+Specimens,"Pig heads, unsplit, fresh (butcher)",,5,15.00,75.00,Local butcher,https://www.broughs.com/p/Pigs_Head_sold_per_half_3kg_each/baec1f619c3448779b46ecc1337db77b/,UNVERIFIED US price (UK ref 8.99 GBP per half),4 tested + 1 practice
+Safety,Nitrile gloves 100 ct,HDX 24570-06,1,15.98,15.98,Home Depot,https://www.homedepot.com/p/HDX-Blue-3-5-mil-Disposable-Nitrile-1-Size-Fits-Most-100-Count-24570-06/319285600,verified 2026-10-17,
+Safety,Cut-resistant gloves A4 (pair),AZ591,2,4.29,8.58,Zoro,https://www.zoro.com/k/a4-cut-resistant-gloves/,verified 2026-10-17,Sold in multiples of 2
+Safety,"Safety glasses, face shield, bleach, zip bags, salt, distilled water",generic,1,30.00,30.00,Local,,UNVERIFIED estimate,0.9% saline from non-iodized salt instead of PBS
+CT,"Micro-CT scanning, 3 h external academic rate",Cornell BRC Skyscan 1276,3,180.00,540.00,Cornell BRC,https://www.biotech.cornell.edu/core-facilities-brc/services/x-ray-micro-ct,verified 2026-10-17,$275/h commercial; $0 if collaborator; 9 cm bore
+TOTAL,Total excluding CT,,,,1150.14,,,,
+TOTAL,Total including 3 h micro-CT at $180/h,,,,1690.14,,,,
+TOTAL,Total including 3 h micro-CT at $275/h (commercial),,,,1975.14,,,,

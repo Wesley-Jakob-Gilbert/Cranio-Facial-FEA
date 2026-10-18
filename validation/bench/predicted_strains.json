@@ -1,0 +1,292 @@
+{
+ "note": "all strains in microstrain PER NEWTON of total pad force; linear, scale by F",
+ "forces_N": [
+  2.0,
+  20.0,
+  50.0,
+  100.0,
+  200.0
+ ],
+ "analytic": {
+  "span25.0_t2.0": {
+   "edge_ue": 5.484375000000002,
+   "mid_ue": 2.742187500000001
+  },
+  "span25.0_t3.0": {
+   "edge_ue": 2.4375000000000004,
+   "mid_ue": 1.2187500000000002
+  },
+  "span25.0_t4.0": {
+   "edge_ue": 1.3710937500000004,
+   "mid_ue": 0.6855468750000002
+  },
+  "span25.0_t6.0": {
+   "edge_ue": 0.6093750000000001,
+   "mid_ue": 0.30468750000000006
+  },
+  "span35.0_t2.0": {
+   "edge_ue": 7.6781250000000005,
+   "mid_ue": 3.8390625000000003
+  },
+  "span35.0_t3.0": {
+   "edge_ue": 3.4125,
+   "mid_ue": 1.70625
+  },
+  "span35.0_t4.0": {
+   "edge_ue": 1.9195312500000001,
+   "mid_ue": 0.9597656250000001
+  },
+  "span35.0_t6.0": {
+   "edge_ue": 0.853125,
+   "mid_ue": 0.4265625
+  }
+ },
+ "bench_analog": [
+  {
+   "geometry_mm": {
+    "span": 35.0,
+    "length": 50.0,
+    "t": 3.0,
+    "pot_band": 5.0,
+    "patch": [
+     25.0,
+     40.0
+    ],
+    "patch_area_mm2": 1000.0000000000005
+   },
+   "E_GPa": 12.5,
+   "nodes": 16422,
+   "tets": 81000,
+   "solve_s": 9.895080152899027,
+   "patch": {
+    "case": "patch",
+    "max_principal_p99_ue": 2.8920589503388676,
+    "min_principal_p1_ue": -1.7457635202730555,
+    "abs_max_ue": 3.0496085573961516,
+    "abs_median_ue": 1.1897153816650312,
+    "abs_p90_ue": 2.060198432340452,
+    "oral_midspan_ue_per_N": [
+     -0.19948163164329535,
+     -1.7693505692022453
+    ],
+    "oral_3mm_from_pot_ue_per_N": [
+     1.7170668483715676,
+     -0.02545470633411683
+    ],
+    "max_u_um_per_N": 0.098999321895759
+   },
+   "span": {
+    "case": "span",
+    "max_principal_p99_ue": 2.078986776497319,
+    "min_principal_p1_ue": -1.2207922699839562,
+    "abs_max_ue": 2.3189883913239115,
+    "abs_median_ue": 0.8893622523389442,
+    "abs_p90_ue": 1.6365067750324045,
+    "oral_midspan_ue_per_N": [
+     0.015566441978724952,
+     -1.1103497938135185
+    ],
+    "oral_3mm_from_pot_ue_per_N": [
+     1.048730204513184,
+     0.0031613831946889397
+    ],
+    "max_u_um_per_N": 0.07149240841877307
+   },
+   "analytic_span_ue_per_N": {
+    "edge_ue": 2.7299999999999995,
+    "mid_ue": 1.3649999999999998
+   }
+  },
+  {
+   "geometry_mm": {
+    "span": 35.0,
+    "length": 50.0,
+    "t": 4.0,
+    "pot_band": 5.0,
+    "patch": [
+     25.0,
+     40.0
+    ],
+    "patch_area_mm2": 1000.0000000000005
+   },
+   "E_GPa": 12.5,
+   "nodes": 16422,
+   "tets": 81000,
+   "solve_s": 9.617032075766474,
+   "patch": {
+    "case": "patch",
+    "max_principal_p99_ue": 1.7427917233854764,
+    "min_principal_p1_ue": -1.0214918159415183,
+    "abs_max_ue": 1.8445541015081959,
+    "abs_median_ue": 0.6964526776004378,
+    "abs_p90_ue": 1.2008087008062955,
+    "oral_midspan_ue_per_N": [
+     -0.1193213491659417,
+     -1.035430643575495
+    ],
+    "oral_3mm_from_pot_ue_per_N": [
+     0.9886096799429583,
+     -0.01850211628346122
+    ],
+    "max_u_um_per_N": 0.04671890297761177
+   },
+   "span": {
+    "case": "span",
+    "max_principal_p99_ue": 1.275069748780549,
+    "min_principal_p1_ue": -0.7218185743205886,
+    "abs_max_ue": 1.3884587752984754,
+    "abs_median_ue": 0.5261295630957499,
+    "abs_p90_ue": 0.9594440893791617,
+    "oral_midspan_ue_per_N": [
+     0.014275059247258182,
+     -0.6517616219513424
+    ],
+    "oral_3mm_from_pot_ue_per_N": [
+     0.6048970250576388,
+     0.003308246819124388
+    ],
+    "max_u_um_per_N": 0.03408819142229506
+   },
+   "analytic_span_ue_per_N": {
+    "edge_ue": 1.5356250000000002,
+    "mid_ue": 0.7678125000000001
+   }
+  },
+  {
+   "geometry_mm": {
+    "span": 35.0,
+    "length": 50.0,
+    "t": 6.0,
+    "pot_band": 5.0,
+    "patch": [
+     25.0,
+     40.0
+    ],
+    "patch_area_mm2": 1000.0000000000005
+   },
+   "E_GPa": 12.5,
+   "nodes": 16422,
+   "tets": 81000,
+   "solve_s": 9.935341305099428,
+   "patch": {
+    "case": "patch",
+    "max_principal_p99_ue": 0.8306292521637392,
+    "min_principal_p1_ue": -0.4662642394466248,
+    "abs_max_ue": 0.8817856146792838,
+    "abs_median_ue": 0.3175805428847154,
+    "abs_p90_ue": 0.5514577816373403,
+    "oral_midspan_ue_per_N": [
+     -0.05638734634050066,
+     -0.47263612942021177
+    ],
+    "oral_3mm_from_pot_ue_per_N": [
+     0.43843894516836635,
+     -0.012164866620849788
+    ],
+    "max_u_um_per_N": 0.017034254952172874
+   },
+   "span": {
+    "case": "span",
+    "max_principal_p99_ue": 0.6290625417437592,
+    "min_principal_p1_ue": -0.33303649439549715,
+    "abs_max_ue": 0.6829355761926608,
+    "abs_median_ue": 0.2445451354515291,
+    "abs_p90_ue": 0.4534350567489133,
+    "oral_midspan_ue_per_N": [
+     0.013019026305760852,
+     -0.30120750769451043
+    ],
+    "oral_3mm_from_pot_ue_per_N": [
+     0.2700957971861789,
+     0.0034747524569597368
+    ],
+    "max_u_um_per_N": 0.012579994314830293
+   },
+   "analytic_span_ue_per_N": {
+    "edge_ue": 0.6824999999999999,
+    "mid_ue": 0.34124999999999994
+   }
+  }
+ ],
+ "bench_analog_refined_t4": {
+  "geometry_mm": {
+   "span": 35.0,
+   "length": 50.0,
+   "t": 4.0,
+   "pot_band": 5.0,
+   "patch": [
+    25.0,
+    40.0
+   ],
+   "patch_area_mm2": 1016.0651408450705
+  },
+  "E_GPa": 12.5,
+  "nodes": 42120,
+  "tets": 218112,
+  "solve_s": 77.21280430722982,
+  "patch": {
+   "case": "patch",
+   "max_principal_p99_ue": 1.8371869546395203,
+   "min_principal_p1_ue": -1.0859388940375663,
+   "abs_max_ue": 2.0728444011265985,
+   "abs_median_ue": 0.7408696027341597,
+   "abs_p90_ue": 1.282627203837014,
+   "oral_midspan_ue_per_N": [
+    -0.1249208912499992,
+    -1.0992621709127004
+   ],
+   "oral_3mm_from_pot_ue_per_N": [
+    1.146767790050592,
+    -0.01780533856262845
+   ],
+   "max_u_um_per_N": 0.04983780912603218
+  },
+  "span": {
+   "case": "span",
+   "max_principal_p99_ue": 1.4247732849105312,
+   "min_principal_p1_ue": -0.7846305006244476,
+   "abs_max_ue": 1.605890184923953,
+   "abs_median_ue": 0.5761664763119007,
+   "abs_p90_ue": 1.017082477821823,
+   "oral_midspan_ue_per_N": [
+    0.015501095172546962,
+    -0.6990399196317492
+   ],
+   "oral_3mm_from_pot_ue_per_N": [
+    0.7114682229709562,
+    0.003142973581052751
+   ],
+   "max_u_um_per_N": 0.037106094426646356
+  },
+  "analytic_span_ue_per_N": {
+   "edge_ue": 1.5356250000000002,
+   "mid_ue": 0.7678125000000001
+  }
+ },
+ "template": {
+  "palate_area_mm2": 1603.4948020639679,
+  "force_at_2kPa_N": 3.2069896041279353,
+  "nodes": 3262,
+  "tets": 15426,
+  "repo_fixed": {
+   "case": "repo_fixed (bone, excl. suture)",
+   "max_principal_p99_ue": 1.0230082587901668,
+   "min_principal_p1_ue": -1.1922468613127435,
+   "abs_max_ue": 8.057837722775785,
+   "abs_median_ue": 0.34384276363675614,
+   "abs_p90_ue": 0.8200623292803209,
+   "suture_abs_max_ue_per_N": 18.886529574298866,
+   "solve_s": 1.4483272191137075
+  },
+  "bench_potted": {
+   "case": "bench_potted (bone, excl. suture)",
+   "max_principal_p99_ue": 1.21747584936225,
+   "min_principal_p1_ue": -0.45590668372158216,
+   "abs_max_ue": 5.294392117528626,
+   "abs_median_ue": 0.3673603089415407,
+   "abs_p90_ue": 0.8033763013868114,
+   "suture_abs_max_ue_per_N": 10.045509150984078,
+   "solve_s": 1.2025635549798608
+  }
+ }
+}

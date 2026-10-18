@@ -1,0 +1,60 @@
+{
+ "model": "M1",
+ "agreement": {
+  "n": 36,
+  "slope": 1.1534580441717321,
+  "slope_ci95": [
+   1.1227614887218973,
+   1.1964381803088553
+  ],
+  "intercept": -0.05093322162382427,
+  "r2": 0.9872453809749082,
+  "rmse": 0.21201128764485874,
+  "nrmse": 0.09825404891502343,
+  "max_abs_meas": 2.157786778112524,
+  "bland_altman_log_ratio": {
+   "bias": 0.14384045706976156,
+   "loa": [
+    -0.07596006381334292,
+    0.36364097795286604
+   ]
+  },
+  "frac_within_30pct": 0.8611111111111112,
+  "slope_by_specimen": {
+   "S1": 1.2180250233757461,
+   "S2": 1.1339098563357077,
+   "S3": 1.1101159071134579,
+   "S4": 1.124011519161798
+  }
+ },
+ "verdict": {
+  "criteria": {
+   "r2": true,
+   "slope_ci": true,
+   "slope_point": true,
+   "intercept": true,
+   "nrmse": true,
+   "within30": true,
+   "specimens": true
+  },
+  "all_pass": true,
+  "magnitude_falsified": false
+ },
+ "excluded": [],
+ "accept": {
+  "r2_min": 0.8,
+  "slope_ci_within": [
+   0.75,
+   1.33
+  ],
+  "slope_point_within": [
+   0.8,
+   1.25
+  ],
+  "intercept_abs_max_frac": 0.1,
+  "nrmse_max": 0.2,
+  "frac_within_30pct_min": 0.7,
+  "specimens_slope_ok_min": 3,
+  "angle_err_max_deg": 15.0
+ }
+}

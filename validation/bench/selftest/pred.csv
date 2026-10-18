@@ -1,0 +1,5 @@
+gauge_id,pred_ue_per_kPa,pred_ue_per_N,n_elems,sd_ue_per_kPa,surface_offset_mm
+N_mid,0.74630,0.74630,11,0.15192,0.373
+N_edge,-0.84546,-0.84546,11,0.14586,0.471
+O_edge,0.94061,0.94061,11,0.22544,0.471
+N_mid_long,0.11935,0.11935,11,0.01968,0.373
