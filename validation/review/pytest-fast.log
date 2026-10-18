@@ -1,0 +1,36 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.1.1, pluggy-1.7.0
+cachedir: validation/review/pytest-cache
+rootdir: /home/user/workspace/Cranio-Facial-FEA
+configfile: pyproject.toml
+testpaths: tests
+collected 194 items / 2 deselected / 1 skipped / 192 selected
+
+tests/test_backend_calculix.py ........sssss                             [  6%]
+tests/test_backend_common.py .........                                   [ 11%]
+tests/test_backend_febio.py ........ssss                                 [ 17%]
+tests/test_cli.py ......                                                 [ 20%]
+tests/test_config.py ........................                            [ 33%]
+tests/test_data.py .....s                                                [ 36%]
+tests/test_fem_analytic.py .......                                       [ 40%]
+tests/test_fem_constitutive.py ........                                  [ 44%]
+tests/test_fem_gradient.py ....                                          [ 46%]
+tests/test_fem_kernels.py ....                                           [ 48%]
+tests/test_fem_solver.py .........                                       [ 53%]
+tests/test_materials.py ............                                     [ 59%]
+tests/test_mesh_ct.py ...sss                                             [ 62%]
+tests/test_mesh_frame.py ...........                                     [ 68%]
+tests/test_mesh_labeling.py .........                                    [ 72%]
+tests/test_mesh_quality.py ....                                          [ 75%]
+tests/test_mesh_remesh.py .s                                             [ 76%]
+tests/test_mesh_template.py ............                                 [ 82%]
+tests/test_primitives.py .                                               [ 82%]
+tests/test_reference_solver.py .                                         [ 83%]
+tests/test_remodel_guards.py ...                                         [ 84%]
+tests/test_remodel_law.py ..........                                     [ 90%]
+tests/test_remodel_loading.py .......                                    [ 93%]
+tests/test_remodel_sensitivity.py .....                                  [ 96%]
+tests/test_remodel_stimulus.py .......                                   [100%]
+
+- generated xml file: /home/user/workspace/Cranio-Facial-FEA/validation/review/pytest-fast.xml -
+================ 178 passed, 15 skipped, 2 deselected in 47.09s ================

@@ -1,0 +1,44 @@
+{
+  "assumptions": "swallowing only; identical load patterns; no gravity; SI",
+  "sed_Pa": 0.0075,
+  "effective_strain": 1e-06,
+  "threshold": {
+    "ignoring_reference": 881064.8437500008,
+    "with_reference": 881193.8593429468,
+    "bisection": 881193.8593429481,
+    "threshold_in_1Hz_days": 10.199003001654477,
+    "error_at_n1": 1.316740481094314e-07,
+    "error_at_n86400": 0.011187445687327546,
+    "ratio_at_threshold": 1.1,
+    "m2": 7174.309140601279,
+    "m8": 6869280709.758295,
+    "w_zero": 0.0,
+    "chewing_equals_49_times_swallow_term": 44059692.96714736
+  },
+  "calibration": {
+    "psi_star": 4.9492320039049405e-06,
+    "reference_error": 0.0,
+    "rate_cortical_per_day": 0.00010958904109589041,
+    "rate_cancellous_per_day": 0.000767123287671233,
+    "monthly_dt_days": 30.416666666666668,
+    "gf_per_cm2_in_Pa": 98.06649999999999,
+    "minutes_for_1500_chews_at_1p57Hz": 15.92356687898089,
+    "chews_for_35p3min_at_1p57Hz": 3325.26,
+    "two_kPa_fraction_of_max_range": [
+      0.04878048780487805,
+      0.2
+    ],
+    "mouth_breathing_at_1e7_error": -0.00013164390609365917,
+    "mouth_breathing_resorption_threshold": 9950810185.185183
+  },
+  "general_threshold_test": 6.626060779352504,
+  "smoothing_example": {
+    "raw_threshold": 0.4641000000000004,
+    "equal_average_threshold": 1.0735999999999999,
+    "threshold_multiplier": 2.313294548588664
+  },
+  "98pct_power_share": {
+    "remaining_stimulus_ratio_if_chew_removed": 0.3760603093086394,
+    "remaining_stimulus_ratio_if_other_removed": 0.9949620563926881
+  }
+}

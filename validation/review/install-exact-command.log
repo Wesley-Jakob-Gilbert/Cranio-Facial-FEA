@@ -1,0 +1,52 @@
+Obtaining file:///home/user/workspace/Cranio-Facial-FEA/validation/review/install-checkout
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: numpy>=1.26 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (2.5.4)
+Requirement already satisfied: scipy>=1.11 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (1.18.1)
+Requirement already satisfied: jax>=0.4.30 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (0.11.2)
+Requirement already satisfied: pyamg>=5.0 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (5.3.0)
+Requirement already satisfied: threadpoolctl>=3.1 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (3.7.0)
+Requirement already satisfied: pyyaml>=6.0 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (6.0.3)
+Requirement already satisfied: matplotlib>=3.8 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (3.11.2)
+Requirement already satisfied: meshio>=5.3 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (5.3.5)
+Requirement already satisfied: pytest>=8 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (9.1.1)
+Requirement already satisfied: ruff>=0.5 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from craniofea==0.2.0) (0.17.1)
+Requirement already satisfied: jaxlib<=0.11.2,>=0.11.2 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from jax>=0.4.30->craniofea==0.2.0) (0.11.2)
+Requirement already satisfied: ml_dtypes>=0.5.0 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from jax>=0.4.30->craniofea==0.2.0) (0.6.0)
+Requirement already satisfied: opt_einsum in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from jax>=0.4.30->craniofea==0.2.0) (3.4.0)
+Requirement already satisfied: contourpy>=1.0.1 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (1.4.0)
+Requirement already satisfied: cycler>=0.10 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (0.12.1)
+Requirement already satisfied: fonttools>=4.28.2 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (4.67.0)
+Requirement already satisfied: kiwisolver>=1.3.1 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (1.5.1)
+Requirement already satisfied: packaging>=20.0 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (26.3)
+Requirement already satisfied: pillow>=9 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (13.0.0)
+Requirement already satisfied: pyparsing>=3 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (3.3.3)
+Requirement already satisfied: python-dateutil>=2.7 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from matplotlib>=3.8->craniofea==0.2.0) (2.9.0.post0)
+Requirement already satisfied: rich in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from meshio>=5.3->craniofea==0.2.0) (15.0.0)
+Requirement already satisfied: iniconfig>=1.0.1 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from pytest>=8->craniofea==0.2.0) (2.3.1)
+Requirement already satisfied: pluggy<2,>=1.5 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from pytest>=8->craniofea==0.2.0) (1.7.0)
+Requirement already satisfied: pygments>=2.7.2 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from pytest>=8->craniofea==0.2.0) (2.21.0)
+Requirement already satisfied: six>=1.5 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib>=3.8->craniofea==0.2.0) (1.17.0)
+Requirement already satisfied: markdown-it-py>=2.2.0 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from rich->meshio>=5.3->craniofea==0.2.0) (4.2.0)
+Requirement already satisfied: mdurl~=0.1 in /home/user/workspace/Cranio-Facial-FEA/validation/review/.venv/lib/python3.12/site-packages (from markdown-it-py>=2.2.0->rich->meshio>=5.3->craniofea==0.2.0) (0.1.2)
+Building wheels for collected packages: craniofea
+  Building editable for craniofea (pyproject.toml): started
+  Building editable for craniofea (pyproject.toml): finished with status 'done'
+  Created wheel for craniofea: filename=craniofea-0.2.0-0.editable-py3-none-any.whl size=6062 sha256=2a5b5d440026ba029d1a4ad437067faa9fbba0275bbb3b50cc3923cfabea8b00
+  Stored in directory: /home/user/workspace/Cranio-Facial-FEA/validation/review/tmp/pip-ephem-wheel-cache-xnatkqqs/wheels/04/04/07/365804ce5258cd2b0fd692528627b1c3d4349459cde9773424
+Successfully built craniofea
+Installing collected packages: craniofea
+  Attempting uninstall: craniofea
+    Found existing installation: craniofea 0.2.0
+    Uninstalling craniofea-0.2.0:
+      Successfully uninstalled craniofea-0.2.0
+Successfully installed craniofea-0.2.0
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: /home/user/workspace/Cranio-Facial-FEA/validation/review/install-checkout/../.venv/bin/python -m pip install --upgrade pip

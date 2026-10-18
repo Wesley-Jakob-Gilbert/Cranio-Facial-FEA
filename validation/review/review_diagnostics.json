@@ -1,0 +1,1052 @@
+{
+  "setpoint_floor_smoothing": {
+    "floor_element": 0,
+    "raw_error": 0.0,
+    "smoothed_error": 0.6666666666666669,
+    "density_rate_per_day": 6.233333333333336e-05,
+    "documented_fixed_behavior_refuted": true
+  },
+  "template": [
+    {
+      "n_static": 1.0,
+      "steps": 12,
+      "mewing_mean_drho": 0.0,
+      "mouth_breathing_mean_drho": 0.0,
+      "contrast": 0.0,
+      "shares_mewing": {
+        "rest_posture": 2.0078135308023726e-08,
+        "swallow": 0.0635964762336457,
+        "chew": 0.9364035036881241,
+        "gravity": 9.493207235962818e-14
+      },
+      "max_abs_error_mewing": 1.4659991887281972e-07,
+      "manifest": {
+        "created_utc": "2026-10-18T00:23:29+00:00",
+        "config_hash": "3dfc4e705ba84570b53ae1b2f6bd43c7afb5a81639ee872949cb3e1538b9a099",
+        "config": {
+          "name": "study",
+          "mesh": {
+            "source": "file",
+            "path": "data/derived/patient3_maxilla.npz",
+            "fallback": [
+              "template"
+            ],
+            "template": {},
+            "box": {}
+          },
+          "solver": {
+            "name": "jax",
+            "options": {}
+          },
+          "materials": {
+            "cortical": {
+              "E": 15000000000.0,
+              "nu": 0.3,
+              "n": 3.0,
+              "mass_density": 1850.0,
+              "anisotropy": "orthotropic",
+              "ortho": {
+                "E1": 20000000000.0,
+                "E2": 13000000000.0,
+                "E3": 11000000000.0,
+                "G12": 5000000000.0,
+                "G13": 4000000000.0,
+                "G23": 3500000000.0,
+                "nu12": 0.3,
+                "nu13": 0.3,
+                "nu23": 0.3
+              }
+            },
+            "cancellous": {
+              "E": 1000000000.0,
+              "nu": 0.3,
+              "n": 2.0,
+              "mass_density": 1000.0
+            },
+            "suture": {
+              "E": 10000000.0,
+              "nu": 0.45,
+              "mass_density": 1100.0
+            }
+          },
+          "loading": {
+            "resting": {
+              "ap_ratio": 2.0
+            },
+            "swallowing": {
+              "pressure": 15000.0,
+              "cycles_per_day": 600.0,
+              "ap_ratio": 1.0
+            },
+            "mastication": {
+              "force": 100.0,
+              "cycles_per_day": 1500.0,
+              "molar_weight": 3.0,
+              "inclination_deg": 0.0
+            },
+            "gravity": {
+              "enabled": true,
+              "g": 9.81
+            },
+            "scenarios": {
+              "reference": {
+                "resting_pressure": 200.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "habitual resting tongue posture (defines the homeostatic setpoint)"
+              },
+              "mewing": {
+                "resting_pressure": 2000.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "sustained tongue-on-palate posture"
+              },
+              "mouth_breathing": {
+                "resting_pressure": 0.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "tongue low, no palatal contact; swallowing and chewing unchanged"
+              }
+            }
+          },
+          "stimulus": {
+            "m": 4.0,
+            "static_equivalent_cycles": 1.0,
+            "setpoint_floor": 1e-06
+          },
+          "remodeling": {
+            "lazy_zone": 0.1,
+            "formation_rate": {
+              "cortical": 0.00011,
+              "cancellous": 0.00077
+            },
+            "resorption_rate": {
+              "cortical": 0.00011,
+              "cancellous": 0.00077
+            },
+            "rho_min": {
+              "cortical": 0.5,
+              "cancellous": 0.25
+            },
+            "rho_max": {
+              "cortical": 1.15,
+              "cancellous": 2.0
+            },
+            "days": 365.0,
+            "n_steps": 12,
+            "smoothing": true
+          },
+          "sensitivity": {
+            "static_cycles": [
+              0.0,
+              1.0,
+              10.0,
+              100.0,
+              1000.0,
+              10000.0,
+              86400.0,
+              100000.0,
+              1000000.0,
+              10000000.0
+            ],
+            "region": "region_palatal_vault",
+            "contrast": [
+              "mewing",
+              "mouth_breathing"
+            ],
+            "morris": {
+              "trajectories": 10,
+              "levels": 4,
+              "seed": 0,
+              "parameters": {
+                "loading.scenarios.mewing.resting_pressure": {
+                  "lo": 1000.0,
+                  "hi": 4000.0,
+                  "log": false
+                },
+                "loading.scenarios.reference.resting_pressure": {
+                  "lo": 50.0,
+                  "hi": 500.0,
+                  "log": false
+                },
+                "loading.resting.ap_ratio": {
+                  "lo": 0.5,
+                  "hi": 3.0,
+                  "log": false
+                },
+                "loading.swallowing.pressure": {
+                  "lo": 5000.0,
+                  "hi": 30000.0,
+                  "log": false
+                },
+                "loading.swallowing.cycles_per_day": {
+                  "lo": 230.0,
+                  "hi": 1000.0,
+                  "log": false
+                },
+                "loading.mastication.force": {
+                  "lo": 50.0,
+                  "hi": 250.0,
+                  "log": false
+                },
+                "loading.mastication.cycles_per_day": {
+                  "lo": 200.0,
+                  "hi": 3300.0,
+                  "log": false
+                },
+                "stimulus.m": {
+                  "lo": 2.0,
+                  "hi": 8.0,
+                  "log": false
+                },
+                "stimulus.static_equivalent_cycles": {
+                  "lo": 1.0,
+                  "hi": 1000000.0,
+                  "log": true
+                },
+                "remodeling.lazy_zone": {
+                  "lo": 0.0,
+                  "hi": 0.3,
+                  "log": false
+                },
+                "remodeling.formation_rate.cancellous": {
+                  "lo": 0.0002,
+                  "hi": 0.002,
+                  "log": true
+                },
+                "materials.cortical.ortho.E1": {
+                  "lo": 15000000000.0,
+                  "hi": 30000000000.0,
+                  "log": false
+                },
+                "materials.cancellous.E": {
+                  "lo": 300000000.0,
+                  "hi": 2000000000.0,
+                  "log": false
+                },
+                "materials.suture.E": {
+                  "lo": 1000000.0,
+                  "hi": 100000000.0,
+                  "log": true
+                }
+              }
+            }
+          },
+          "output_dir": "results/study"
+        },
+        "git": {
+          "commit": "0d53c02397d6ea7c84978b6a6155cb96d7d6b158",
+          "dirty": true
+        },
+        "versions": {
+          "python": "3.12.13",
+          "craniofea": "0.2.0",
+          "numpy": "2.5.4",
+          "scipy": "1.18.1",
+          "jax": "0.11.2",
+          "pyamg": "5.3.0",
+          "pyyaml": "6.0.3",
+          "craniofea_source": "0.2.0"
+        },
+        "platform": "Linux-6.1.155+-x86_64-with-glibc2.43",
+        "solver": "jax",
+        "mesh": {
+          "n_nodes": 3262,
+          "n_elems": 15426,
+          "meta": {
+            "source": "parametric_template",
+            "params_mm": {
+              "arch_width": 46.0,
+              "arch_depth": 40.0,
+              "arch_flatness": 0.0,
+              "arch_squareness": 2.8,
+              "posterior_flare_deg": 4.0,
+              "buccal_half_width": 4.0,
+              "buccal_height": 5.0,
+              "palatal_wall_width": 9.0,
+              "vault_height": 12.0,
+              "palate_thickness": 3.5,
+              "body_height": 3.0,
+              "body_band": 0.0,
+              "body_transition": 4.0,
+              "posterior_bow": 1.5,
+              "plan_size": 2.4,
+              "layers": 6,
+              "suture_half_width": 0.5
+            },
+            "frame": {
+              "method": "constructed"
+            },
+            "labels": {
+              "fixed_released_over_palate_mm2": 0.0,
+              "fixed_area_mm2": {
+                "superior": 452.6791948838205
+              },
+              "fixed_rim_area_mm2": 6.594261457964348,
+              "config": {
+                "fixed": {
+                  "directions": [
+                    "superior"
+                  ],
+                  "angle_tol_deg": 12.0,
+                  "plane_tol_mm": 0.2,
+                  "search_depth_mm": 3.0,
+                  "min_area_fraction": 0.01,
+                  "palatal_exclusion_radius_mm": 2.0,
+                  "palatal_max_thickness_mm": 5.0,
+                  "rims": true,
+                  "rim_max_angle_deg": 50.0,
+                  "rim_buccal_offset_mm": 1.5,
+                  "rim_min_height_mm": 8.0,
+                  "rim_min_component_fraction": 0.02
+                },
+                "palate": {
+                  "max_angle_deg": 75.0,
+                  "min_socket_distance_mm": 2.0,
+                  "posterior_extension_mm": 15.0,
+                  "last_tooth_band_mm": 8.0,
+                  "posterior_wedge_slope": 1.0,
+                  "pns_margin_mm": 1.0,
+                  "min_component_fraction": 0.05
+                },
+                "occlusal": {
+                  "crest_distance_mm": 1.0,
+                  "crest_max_angle_deg": 70.0
+                },
+                "layers": {
+                  "cortical_thickness_mm": 1.5,
+                  "socket_lining_mm": 0.4,
+                  "suture_half_width_mm": 0.5,
+                  "suture_nasal_margin_mm": 4.0
+                },
+                "regions": {
+                  "anterior_fraction": 0.3,
+                  "alveolar_min_height_mm": 12.0,
+                  "vault_max_depth_mm": 8.0
+                },
+                "template": {
+                  "crest_half_width_mm": 3.0,
+                  "palate_min_q_mm": 4.0
+                }
+              },
+              "suture_si_cap_mm": 4.0792114217284965,
+              "alveolar_crest_si_mm": -11.677868528739554,
+              "alveolar_apex_si_mm": 0.3221314712604471,
+              "anterior_split_ap_mm": 10.769847092961028
+            }
+          }
+        },
+        "scenarios": [
+          "mewing",
+          "mouth_breathing"
+        ],
+        "wall_time_s": 58.472763592842966,
+        "solver_worst": {
+          "relative_residual": 9.573521176315094e-11,
+          "iterations": 70,
+          "n_solves": 84
+        },
+        "load_cases_reference": [
+          "chew",
+          "gravity",
+          "rest_posture",
+          "swallow"
+        ]
+      }
+    },
+    {
+      "n_static": 10000000.0,
+      "steps": 12,
+      "mewing_mean_drho": 0.006563525069730424,
+      "mouth_breathing_mean_drho": 0.0,
+      "contrast": 0.006563525069730424,
+      "shares_mewing": {
+        "rest_posture": 0.1672087904993582,
+        "swallow": 0.05296253714750937,
+        "chew": 0.7798278817679135,
+        "gravity": 7.905852189623777e-07
+      },
+      "max_abs_error_mewing": 0.6126715396183557,
+      "manifest": {
+        "created_utc": "2026-10-18T00:24:27+00:00",
+        "config_hash": "bd39743974cd2be064102898a05b595daa3e40ca6c00752cd6817add6b7f92fb",
+        "config": {
+          "name": "study",
+          "mesh": {
+            "source": "file",
+            "path": "data/derived/patient3_maxilla.npz",
+            "fallback": [
+              "template"
+            ],
+            "template": {},
+            "box": {}
+          },
+          "solver": {
+            "name": "jax",
+            "options": {}
+          },
+          "materials": {
+            "cortical": {
+              "E": 15000000000.0,
+              "nu": 0.3,
+              "n": 3.0,
+              "mass_density": 1850.0,
+              "anisotropy": "orthotropic",
+              "ortho": {
+                "E1": 20000000000.0,
+                "E2": 13000000000.0,
+                "E3": 11000000000.0,
+                "G12": 5000000000.0,
+                "G13": 4000000000.0,
+                "G23": 3500000000.0,
+                "nu12": 0.3,
+                "nu13": 0.3,
+                "nu23": 0.3
+              }
+            },
+            "cancellous": {
+              "E": 1000000000.0,
+              "nu": 0.3,
+              "n": 2.0,
+              "mass_density": 1000.0
+            },
+            "suture": {
+              "E": 10000000.0,
+              "nu": 0.45,
+              "mass_density": 1100.0
+            }
+          },
+          "loading": {
+            "resting": {
+              "ap_ratio": 2.0
+            },
+            "swallowing": {
+              "pressure": 15000.0,
+              "cycles_per_day": 600.0,
+              "ap_ratio": 1.0
+            },
+            "mastication": {
+              "force": 100.0,
+              "cycles_per_day": 1500.0,
+              "molar_weight": 3.0,
+              "inclination_deg": 0.0
+            },
+            "gravity": {
+              "enabled": true,
+              "g": 9.81
+            },
+            "scenarios": {
+              "reference": {
+                "resting_pressure": 200.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "habitual resting tongue posture (defines the homeostatic setpoint)"
+              },
+              "mewing": {
+                "resting_pressure": 2000.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "sustained tongue-on-palate posture"
+              },
+              "mouth_breathing": {
+                "resting_pressure": 0.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "tongue low, no palatal contact; swallowing and chewing unchanged"
+              }
+            }
+          },
+          "stimulus": {
+            "m": 4.0,
+            "static_equivalent_cycles": 10000000.0,
+            "setpoint_floor": 1e-06
+          },
+          "remodeling": {
+            "lazy_zone": 0.1,
+            "formation_rate": {
+              "cortical": 0.00011,
+              "cancellous": 0.00077
+            },
+            "resorption_rate": {
+              "cortical": 0.00011,
+              "cancellous": 0.00077
+            },
+            "rho_min": {
+              "cortical": 0.5,
+              "cancellous": 0.25
+            },
+            "rho_max": {
+              "cortical": 1.15,
+              "cancellous": 2.0
+            },
+            "days": 365.0,
+            "n_steps": 12,
+            "smoothing": true
+          },
+          "sensitivity": {
+            "static_cycles": [
+              0.0,
+              1.0,
+              10.0,
+              100.0,
+              1000.0,
+              10000.0,
+              86400.0,
+              100000.0,
+              1000000.0,
+              10000000.0
+            ],
+            "region": "region_palatal_vault",
+            "contrast": [
+              "mewing",
+              "mouth_breathing"
+            ],
+            "morris": {
+              "trajectories": 10,
+              "levels": 4,
+              "seed": 0,
+              "parameters": {
+                "loading.scenarios.mewing.resting_pressure": {
+                  "lo": 1000.0,
+                  "hi": 4000.0,
+                  "log": false
+                },
+                "loading.scenarios.reference.resting_pressure": {
+                  "lo": 50.0,
+                  "hi": 500.0,
+                  "log": false
+                },
+                "loading.resting.ap_ratio": {
+                  "lo": 0.5,
+                  "hi": 3.0,
+                  "log": false
+                },
+                "loading.swallowing.pressure": {
+                  "lo": 5000.0,
+                  "hi": 30000.0,
+                  "log": false
+                },
+                "loading.swallowing.cycles_per_day": {
+                  "lo": 230.0,
+                  "hi": 1000.0,
+                  "log": false
+                },
+                "loading.mastication.force": {
+                  "lo": 50.0,
+                  "hi": 250.0,
+                  "log": false
+                },
+                "loading.mastication.cycles_per_day": {
+                  "lo": 200.0,
+                  "hi": 3300.0,
+                  "log": false
+                },
+                "stimulus.m": {
+                  "lo": 2.0,
+                  "hi": 8.0,
+                  "log": false
+                },
+                "stimulus.static_equivalent_cycles": {
+                  "lo": 1.0,
+                  "hi": 1000000.0,
+                  "log": true
+                },
+                "remodeling.lazy_zone": {
+                  "lo": 0.0,
+                  "hi": 0.3,
+                  "log": false
+                },
+                "remodeling.formation_rate.cancellous": {
+                  "lo": 0.0002,
+                  "hi": 0.002,
+                  "log": true
+                },
+                "materials.cortical.ortho.E1": {
+                  "lo": 15000000000.0,
+                  "hi": 30000000000.0,
+                  "log": false
+                },
+                "materials.cancellous.E": {
+                  "lo": 300000000.0,
+                  "hi": 2000000000.0,
+                  "log": false
+                },
+                "materials.suture.E": {
+                  "lo": 1000000.0,
+                  "hi": 100000000.0,
+                  "log": true
+                }
+              }
+            }
+          },
+          "output_dir": "results/study"
+        },
+        "git": {
+          "commit": "0d53c02397d6ea7c84978b6a6155cb96d7d6b158",
+          "dirty": true
+        },
+        "versions": {
+          "python": "3.12.13",
+          "craniofea": "0.2.0",
+          "numpy": "2.5.4",
+          "scipy": "1.18.1",
+          "jax": "0.11.2",
+          "pyamg": "5.3.0",
+          "pyyaml": "6.0.3",
+          "craniofea_source": "0.2.0"
+        },
+        "platform": "Linux-6.1.155+-x86_64-with-glibc2.43",
+        "solver": "jax",
+        "mesh": {
+          "n_nodes": 3262,
+          "n_elems": 15426,
+          "meta": {
+            "source": "parametric_template",
+            "params_mm": {
+              "arch_width": 46.0,
+              "arch_depth": 40.0,
+              "arch_flatness": 0.0,
+              "arch_squareness": 2.8,
+              "posterior_flare_deg": 4.0,
+              "buccal_half_width": 4.0,
+              "buccal_height": 5.0,
+              "palatal_wall_width": 9.0,
+              "vault_height": 12.0,
+              "palate_thickness": 3.5,
+              "body_height": 3.0,
+              "body_band": 0.0,
+              "body_transition": 4.0,
+              "posterior_bow": 1.5,
+              "plan_size": 2.4,
+              "layers": 6,
+              "suture_half_width": 0.5
+            },
+            "frame": {
+              "method": "constructed"
+            },
+            "labels": {
+              "fixed_released_over_palate_mm2": 0.0,
+              "fixed_area_mm2": {
+                "superior": 452.6791948838205
+              },
+              "fixed_rim_area_mm2": 6.594261457964348,
+              "config": {
+                "fixed": {
+                  "directions": [
+                    "superior"
+                  ],
+                  "angle_tol_deg": 12.0,
+                  "plane_tol_mm": 0.2,
+                  "search_depth_mm": 3.0,
+                  "min_area_fraction": 0.01,
+                  "palatal_exclusion_radius_mm": 2.0,
+                  "palatal_max_thickness_mm": 5.0,
+                  "rims": true,
+                  "rim_max_angle_deg": 50.0,
+                  "rim_buccal_offset_mm": 1.5,
+                  "rim_min_height_mm": 8.0,
+                  "rim_min_component_fraction": 0.02
+                },
+                "palate": {
+                  "max_angle_deg": 75.0,
+                  "min_socket_distance_mm": 2.0,
+                  "posterior_extension_mm": 15.0,
+                  "last_tooth_band_mm": 8.0,
+                  "posterior_wedge_slope": 1.0,
+                  "pns_margin_mm": 1.0,
+                  "min_component_fraction": 0.05
+                },
+                "occlusal": {
+                  "crest_distance_mm": 1.0,
+                  "crest_max_angle_deg": 70.0
+                },
+                "layers": {
+                  "cortical_thickness_mm": 1.5,
+                  "socket_lining_mm": 0.4,
+                  "suture_half_width_mm": 0.5,
+                  "suture_nasal_margin_mm": 4.0
+                },
+                "regions": {
+                  "anterior_fraction": 0.3,
+                  "alveolar_min_height_mm": 12.0,
+                  "vault_max_depth_mm": 8.0
+                },
+                "template": {
+                  "crest_half_width_mm": 3.0,
+                  "palate_min_q_mm": 4.0
+                }
+              },
+              "suture_si_cap_mm": 4.0792114217284965,
+              "alveolar_crest_si_mm": -11.677868528739554,
+              "alveolar_apex_si_mm": 0.3221314712604471,
+              "anterior_split_ap_mm": 10.769847092961028
+            }
+          }
+        },
+        "scenarios": [
+          "mewing",
+          "mouth_breathing"
+        ],
+        "wall_time_s": 57.50838546222076,
+        "solver_worst": {
+          "relative_residual": 9.923820236105474e-11,
+          "iterations": 70,
+          "n_solves": 84
+        },
+        "load_cases_reference": [
+          "chew",
+          "gravity",
+          "rest_posture",
+          "swallow"
+        ]
+      }
+    },
+    {
+      "n_static": 10000000.0,
+      "steps": 24,
+      "mewing_mean_drho": 0.0065417215210174335,
+      "mouth_breathing_mean_drho": 0.0,
+      "contrast": 0.0065417215210174335,
+      "shares_mewing": {
+        "rest_posture": 0.16720879049943016,
+        "swallow": 0.05296253714753762,
+        "chew": 0.7798278817678133,
+        "gravity": 7.905852189624229e-07
+      },
+      "max_abs_error_mewing": 0.6126715396185234,
+      "manifest": {
+        "created_utc": "2026-10-18T00:26:18+00:00",
+        "config_hash": "97f31d5305141497a7652190c95c9fe68970e0632ec8b8aadf7c4ad8c42ce26d",
+        "config": {
+          "name": "study",
+          "mesh": {
+            "source": "file",
+            "path": "data/derived/patient3_maxilla.npz",
+            "fallback": [
+              "template"
+            ],
+            "template": {},
+            "box": {}
+          },
+          "solver": {
+            "name": "jax",
+            "options": {}
+          },
+          "materials": {
+            "cortical": {
+              "E": 15000000000.0,
+              "nu": 0.3,
+              "n": 3.0,
+              "mass_density": 1850.0,
+              "anisotropy": "orthotropic",
+              "ortho": {
+                "E1": 20000000000.0,
+                "E2": 13000000000.0,
+                "E3": 11000000000.0,
+                "G12": 5000000000.0,
+                "G13": 4000000000.0,
+                "G23": 3500000000.0,
+                "nu12": 0.3,
+                "nu13": 0.3,
+                "nu23": 0.3
+              }
+            },
+            "cancellous": {
+              "E": 1000000000.0,
+              "nu": 0.3,
+              "n": 2.0,
+              "mass_density": 1000.0
+            },
+            "suture": {
+              "E": 10000000.0,
+              "nu": 0.45,
+              "mass_density": 1100.0
+            }
+          },
+          "loading": {
+            "resting": {
+              "ap_ratio": 2.0
+            },
+            "swallowing": {
+              "pressure": 15000.0,
+              "cycles_per_day": 600.0,
+              "ap_ratio": 1.0
+            },
+            "mastication": {
+              "force": 100.0,
+              "cycles_per_day": 1500.0,
+              "molar_weight": 3.0,
+              "inclination_deg": 0.0
+            },
+            "gravity": {
+              "enabled": true,
+              "g": 9.81
+            },
+            "scenarios": {
+              "reference": {
+                "resting_pressure": 200.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "habitual resting tongue posture (defines the homeostatic setpoint)"
+              },
+              "mewing": {
+                "resting_pressure": 2000.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "sustained tongue-on-palate posture"
+              },
+              "mouth_breathing": {
+                "resting_pressure": 0.0,
+                "swallowing_scale": 1.0,
+                "mastication_scale": 1.0,
+                "description": "tongue low, no palatal contact; swallowing and chewing unchanged"
+              }
+            }
+          },
+          "stimulus": {
+            "m": 4.0,
+            "static_equivalent_cycles": 10000000.0,
+            "setpoint_floor": 1e-06
+          },
+          "remodeling": {
+            "lazy_zone": 0.1,
+            "formation_rate": {
+              "cortical": 0.00011,
+              "cancellous": 0.00077
+            },
+            "resorption_rate": {
+              "cortical": 0.00011,
+              "cancellous": 0.00077
+            },
+            "rho_min": {
+              "cortical": 0.5,
+              "cancellous": 0.25
+            },
+            "rho_max": {
+              "cortical": 1.15,
+              "cancellous": 2.0
+            },
+            "days": 365.0,
+            "n_steps": 24,
+            "smoothing": true
+          },
+          "sensitivity": {
+            "static_cycles": [
+              0.0,
+              1.0,
+              10.0,
+              100.0,
+              1000.0,
+              10000.0,
+              86400.0,
+              100000.0,
+              1000000.0,
+              10000000.0
+            ],
+            "region": "region_palatal_vault",
+            "contrast": [
+              "mewing",
+              "mouth_breathing"
+            ],
+            "morris": {
+              "trajectories": 10,
+              "levels": 4,
+              "seed": 0,
+              "parameters": {
+                "loading.scenarios.mewing.resting_pressure": {
+                  "lo": 1000.0,
+                  "hi": 4000.0,
+                  "log": false
+                },
+                "loading.scenarios.reference.resting_pressure": {
+                  "lo": 50.0,
+                  "hi": 500.0,
+                  "log": false
+                },
+                "loading.resting.ap_ratio": {
+                  "lo": 0.5,
+                  "hi": 3.0,
+                  "log": false
+                },
+                "loading.swallowing.pressure": {
+                  "lo": 5000.0,
+                  "hi": 30000.0,
+                  "log": false
+                },
+                "loading.swallowing.cycles_per_day": {
+                  "lo": 230.0,
+                  "hi": 1000.0,
+                  "log": false
+                },
+                "loading.mastication.force": {
+                  "lo": 50.0,
+                  "hi": 250.0,
+                  "log": false
+                },
+                "loading.mastication.cycles_per_day": {
+                  "lo": 200.0,
+                  "hi": 3300.0,
+                  "log": false
+                },
+                "stimulus.m": {
+                  "lo": 2.0,
+                  "hi": 8.0,
+                  "log": false
+                },
+                "stimulus.static_equivalent_cycles": {
+                  "lo": 1.0,
+                  "hi": 1000000.0,
+                  "log": true
+                },
+                "remodeling.lazy_zone": {
+                  "lo": 0.0,
+                  "hi": 0.3,
+                  "log": false
+                },
+                "remodeling.formation_rate.cancellous": {
+                  "lo": 0.0002,
+                  "hi": 0.002,
+                  "log": true
+                },
+                "materials.cortical.ortho.E1": {
+                  "lo": 15000000000.0,
+                  "hi": 30000000000.0,
+                  "log": false
+                },
+                "materials.cancellous.E": {
+                  "lo": 300000000.0,
+                  "hi": 2000000000.0,
+                  "log": false
+                },
+                "materials.suture.E": {
+                  "lo": 1000000.0,
+                  "hi": 100000000.0,
+                  "log": true
+                }
+              }
+            }
+          },
+          "output_dir": "results/study"
+        },
+        "git": {
+          "commit": "0d53c02397d6ea7c84978b6a6155cb96d7d6b158",
+          "dirty": true
+        },
+        "versions": {
+          "python": "3.12.13",
+          "craniofea": "0.2.0",
+          "numpy": "2.5.4",
+          "scipy": "1.18.1",
+          "jax": "0.11.2",
+          "pyamg": "5.3.0",
+          "pyyaml": "6.0.3",
+          "craniofea_source": "0.2.0"
+        },
+        "platform": "Linux-6.1.155+-x86_64-with-glibc2.43",
+        "solver": "jax",
+        "mesh": {
+          "n_nodes": 3262,
+          "n_elems": 15426,
+          "meta": {
+            "source": "parametric_template",
+            "params_mm": {
+              "arch_width": 46.0,
+              "arch_depth": 40.0,
+              "arch_flatness": 0.0,
+              "arch_squareness": 2.8,
+              "posterior_flare_deg": 4.0,
+              "buccal_half_width": 4.0,
+              "buccal_height": 5.0,
+              "palatal_wall_width": 9.0,
+              "vault_height": 12.0,
+              "palate_thickness": 3.5,
+              "body_height": 3.0,
+              "body_band": 0.0,
+              "body_transition": 4.0,
+              "posterior_bow": 1.5,
+              "plan_size": 2.4,
+              "layers": 6,
+              "suture_half_width": 0.5
+            },
+            "frame": {
+              "method": "constructed"
+            },
+            "labels": {
+              "fixed_released_over_palate_mm2": 0.0,
+              "fixed_area_mm2": {
+                "superior": 452.6791948838205
+              },
+              "fixed_rim_area_mm2": 6.594261457964348,
+              "config": {
+                "fixed": {
+                  "directions": [
+                    "superior"
+                  ],
+                  "angle_tol_deg": 12.0,
+                  "plane_tol_mm": 0.2,
+                  "search_depth_mm": 3.0,
+                  "min_area_fraction": 0.01,
+                  "palatal_exclusion_radius_mm": 2.0,
+                  "palatal_max_thickness_mm": 5.0,
+                  "rims": true,
+                  "rim_max_angle_deg": 50.0,
+                  "rim_buccal_offset_mm": 1.5,
+                  "rim_min_height_mm": 8.0,
+                  "rim_min_component_fraction": 0.02
+                },
+                "palate": {
+                  "max_angle_deg": 75.0,
+                  "min_socket_distance_mm": 2.0,
+                  "posterior_extension_mm": 15.0,
+                  "last_tooth_band_mm": 8.0,
+                  "posterior_wedge_slope": 1.0,
+                  "pns_margin_mm": 1.0,
+                  "min_component_fraction": 0.05
+                },
+                "occlusal": {
+                  "crest_distance_mm": 1.0,
+                  "crest_max_angle_deg": 70.0
+                },
+                "layers": {
+                  "cortical_thickness_mm": 1.5,
+                  "socket_lining_mm": 0.4,
+                  "suture_half_width_mm": 0.5,
+                  "suture_nasal_margin_mm": 4.0
+                },
+                "regions": {
+                  "anterior_fraction": 0.3,
+                  "alveolar_min_height_mm": 12.0,
+                  "vault_max_depth_mm": 8.0
+                },
+                "template": {
+                  "crest_half_width_mm": 3.0,
+                  "palate_min_q_mm": 4.0
+                }
+              },
+              "suture_si_cap_mm": 4.0792114217284965,
+              "alveolar_crest_si_mm": -11.677868528739554,
+              "alveolar_apex_si_mm": 0.3221314712604471,
+              "anterior_split_ap_mm": 10.769847092961028
+            }
+          }
+        },
+        "scenarios": [
+          "mewing",
+          "mouth_breathing"
+        ],
+        "wall_time_s": 111.00505322869867,
+        "solver_worst": {
+          "relative_residual": 9.976976559533439e-11,
+          "iterations": 70,
+          "n_solves": 168
+        },
+        "load_cases_reference": [
+          "chew",
+          "gravity",
+          "rest_posture",
+          "swallow"
+        ]
+      }
+    }
+  ]
+}

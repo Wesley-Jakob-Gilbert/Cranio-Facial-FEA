@@ -1,0 +1,44 @@
+Review date: 2026-10-17 America/Denver
+Initial code revision: e1f8deebf2e8919365f78c503c7d244c48e7318b
+validation-prep
+0d53c02397d6ea7c84978b6a6155cb96d7d6b158
+Python 3.12.13
+2
+               total        used        free      shared  buff/cache   available
+Mem:           7.8Gi       246Mi       6.0Gi        24Mi       1.7Gi       7.5Gi
+Swap:             0B          0B          0B
+contourpy==1.4.0
+-e git+https://git-agent-proxy.perplexity.ai/Wesley-Jakob-Gilbert/Cranio-Facial-FEA.git@0d53c02397d6ea7c84978b6a6155cb96d7d6b158#egg=craniofea&subdirectory=validation/review/install-checkout
+cycler==0.12.1
+fonttools==4.67.0
+iniconfig==2.3.1
+jax==0.11.2
+jaxlib==0.11.2
+kiwisolver==1.5.1
+markdown-it-py==4.2.0
+matplotlib==3.11.2
+mdurl==0.1.2
+meshio==5.3.5
+ml_dtypes==0.6.0
+numpy==2.5.4
+opt_einsum==3.4.0
+packaging==26.3
+pillow==13.0.0
+pluggy==1.7.0
+pyamg==5.3.0
+Pygments==2.21.0
+pyparsing==3.3.3
+pytest==9.1.1
+python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+rich==15.0.0
+ruff==0.17.1
+scipy==1.18.1
+six==1.17.0
+threadpoolctl==3.7.0
+
+CT input/result availability at review completion:
+data directory absent
+results/.gitkeep
+
+Protected-file diff against initial package revision (empty means unchanged):

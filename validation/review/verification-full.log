@@ -1,0 +1,40 @@
+
+Lame cylinder: rate u 1.93, stress 0.93
+| level | tets | dofs | h | L2 error u | L2 error stress | CG it |
+|---|---|---|---|---|---|---|
+| 1 | 60 | 108 | 5.000e-03 | 1.053e-01 | 3.901e-01 | 1 |
+| 2 | 240 | 330 | 2.500e-03 | 3.171e-02 | 2.309e-01 | 1 |
+| 4 | 960 | 1,134 | 1.250e-03 | 8.489e-03 | 1.240e-01 | 1 |
+| 8 | 3,840 | 4,182 | 6.250e-04 | 2.176e-03 | 6.378e-02 | 16 |
+| 16 | 15,360 | 16,038 | 3.125e-04 | 5.490e-04 | 3.227e-02 | 18 |
+| 32 | 61,440 | 62,790 | 1.563e-04 | 1.377e-04 | 1.622e-02 | 25 |
+
+Hanging column: rate u 1.93, stress 0.99
+| level | tets | dofs | h | L2 error u | L2 error stress | CG it |
+|---|---|---|---|---|---|---|
+| 1 | 60 | 132 | 1.000e-01 | 2.483e-03 | 4.884e-02 | 1 |
+| 2 | 480 | 567 | 5.000e-02 | 6.589e-04 | 2.474e-02 | 1 |
+| 4 | 3,840 | 3,075 | 2.500e-02 | 1.741e-04 | 1.245e-02 | 13 |
+| 8 | 30,720 | 19,683 | 1.250e-02 | 4.492e-05 | 6.242e-03 | 17 |
+
+Cantilever (L/H = 10, nu = 0.3)
+| level | tets | elements through depth | delta / delta_Timoshenko |
+|---|---|---|---|
+| 1 | 60 | 1 | 0.2194 |
+| 2 | 480 | 2 | 0.5038 |
+| 4 | 3,840 | 4 | 0.7873 |
+| 6 | 12,960 | 6 | 0.8871 |
+| 9 | 43,740 | 9 | 0.9421 |
+Richardson: order 1.47, extrapolated delta / delta_T = 1.0096
+
+Reference-solver agreement (relative L2):
+  amg     pressure  u 3.8e-14 stress 3.8e-14 (it 2)
+  amg     gravity   u 3.5e-14 stress 3.7e-14 (it 2)
+  amg     nodal     u 7.9e-14 stress 5.6e-14 (it 1)
+  jax-cg  pressure  u 2.0e-14 stress 2.3e-14 (it 114)
+  jax-cg  gravity   u 2.0e-14 stress 2.2e-14 (it 112)
+  jax-cg  nodal     u 1.9e-14 stress 5.5e-14 (it 113)
+Patch test (max relative error): {"amg": {"u": 1.665915455859346e-15, "strain": 1.4657776010780116e-14}, "jax-cg": {"u": 7.148562215053586e-14, "strain": 1.3611094976999758e-12}}
+Adjoint gradient vs central FD (relative): {"amg": 1.0758749530859377e-09, "jax-cg": 2.3455335713094954e-09}
+
+figures written to validation/review/figures
